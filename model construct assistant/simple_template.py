@@ -34,6 +34,7 @@ Output strictly in JSON:
 Ensure your response is valid JSON that can be parsed by a JSON parser.
 """
 
+# example with shelling segregation model
 user_prompt = f"""
 Imagine you are an agent in a Shelling segragation model. 
 The agents in this model can be of two types: type 1 and type 2.
@@ -45,13 +46,6 @@ Agents are usually happy when a sufficient proportion of their neighbors are of 
 You can adjust this threshold if reasoning suggests so.
 Translate this reasoning into a small set of explicit if–then rules.
 """
-
-
-def literature_search(query: str) -> str:  # TODO: to be implemented later
-    """
-    A tool that allows AI agent to search for relevant literature through API call
-    """
-    return "No literature yet"
 
 
 # initialize LLM model

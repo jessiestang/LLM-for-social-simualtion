@@ -1,1 +1,7 @@
-Example prompting template
+Imagine you are an agent in a Shelling segragation model. The agents in this model can be of two types: type 1 and type 2.
+The agent is situated in a lattice where it has eight neighbours, which can be either type 1 or type 2.
+You are an agent of type 1.
+You have 3 neighbours of type 1 and 5 neighbours of type 2.
+Think step-by-step and determine whether you are happy or unhappy, and what steps you are going to take next.
+Agents are usually happy when a sufficient proportion of their neighbors are of the same type (e.g., 50% or more). 
+You can adjust this threshold if reasoning suggests so.
