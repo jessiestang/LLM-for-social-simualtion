@@ -33,8 +33,27 @@ class ModelConstructor:
           "interaction_structure": "description of interaction structure",
           "key_behaviors": ["behavior1", "behavior2", "..."],
           "decision_making_processes": ["process1", "process2", "..."],
+          ""key parameters": ["parameter1", "parameter2", "..."]
         }
         Ensure your response is valid JSON that can be parsed by a JSON parser.
+
+        Example
+        The given problem definition is:
+        "We want to model the voting behaviour of citizens in a democratic society.
+        Suppose there are two types of voters with different political preferences (+1 and -1).
+        Voters interact in a social network where they can influence each other's opinions.
+        Each voter decides whether to keep or change their opinin based on that of their neighbours."
+
+        The extracted key information should be:
+        {
+          "agent_types": ["type1: preference +1", "type2: preference -1"],
+          "environment": "Voters are placed in a social network",
+          "interaction_structure (among agents)": "voters can read opinions from their neighbours and influence each other",
+          "interaction_structure (with environment)": "N/A",
+          "key_behaviors": ["interacting with neighbours", "updating own opinion"],
+          "decision_making_processes": ["deciding whether to keep or change opinion based on neighbours' opinions"],
+          "key parameters": ["network structure", "initial opinion distribution", "threshold for opinion change"]
+        }
         """
         user_prompt = problem_definition
 
@@ -64,18 +83,25 @@ class ModelConstructor:
         system_prompt = """
         You are a helpful research assistant who specializes in constructing social simulation models based on provided context.
         You will be provided with a context describing the agent's environment and characteristics.
-        Your task is to analyze the context and generate a set of if–then rules that define the agent's behavior in the simulation.
+        Your task is to analyze the context and help the researcher brainstorm potential mechanism and agent rules behind the problem context.
+        You should perform the following steps:
+        (1) Understand the agent's current situation based on the provided context.
+        (2) Brainstorm potential theoretical mechanisms that could guide agents' behaviors (at least 3).
+        (3) For each mechanism, determine the specific actions the agent would take in response to different conditions.
+        (4) select the most coherent rulesets and output them.
+
         You should think step-by-step and ensure that the rules are clear, concise, and logically sound.
         Output strictly in JSON:
-        {
-        "rules": [
+        { 
+        "social theories and mechanisms":["theory 1 and mechanism1", "theory 2 andmechanism2", "..."],
+        "action rules": [
             "IF condition THEN action",
             "..."
         ],
-        "my_current_situation": "Describe the situation of the agent based on the provided context.",
-        "next_action_based_on_rules": "Describe the action the agent will take based on the rules."
+        "explanations": ["explanation for mechanism1", "explanation for mechanism2", "..."]
+        "summation of how the model works": "..."
         }
-        Ensure your response is valid JSON that can be parsed by a JSON parser.
+        
         """
 
         user_prompt = f"""
@@ -102,6 +128,34 @@ class ModelConstructor:
             print("LLM output not valid JSON, here’s raw output:")
             return response
 
+    def refine_with_feedback(self, agent_rules: str, user_feedback: str):
+        """
+        This LLM agent reflects on the generated model rules and suggests improvements. It also takes users's feedback into account
+        """
+        # load user input
+        system_prompt = """You are a research assistant who specializes in social simulation models. You are given a set of model rules and user feedback.
+        Your task is to refine the model rules based on the feedback and your own reflection. Output the refined model rules in JSON format."""
+        user_prompt = f"""The given model rules are: {agent_rules}. The user feedback is: {user_feedback}. 
+        Please refine the model rules based on the feedback and your own reflection. Output the refined model rules in JSON format."""
+
+        # call the LLM model
+        llm_model = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+
+        # parse the json response
+        response = llm_model.choices[0].message.content
+        try:
+            refined_rules = json.loads(response)
+            return json.dumps(refined_rules, indent=2)
+        except json.JSONDecodeError:
+            print("LLM output not valid JSON, here’s raw output:")
+            return response
+
     def model_construction_pipeline(self, file_path: str):
         """
         This function provides a pipeline that:
@@ -119,5 +173,17 @@ class ModelConstructor:
         agent_rules = self.generate_agent_rules(features)
         print("Generated agent rules:")
         print(agent_rules)
+
+        # ask for user feedback and refine the model
+        user_input = input("do you want to provide any feedback (y/n)?")
+        while user_input.lower() == "y":
+            user_feedback = input("please provide your feedback:")
+            print("Step 3: Refining model based on user feedback...")
+            refined_rules = self.refine_with_feedback(agent_rules, user_feedback)
+            print("Refined agent rules:")
+            print(refined_rules)
+            user_input = input("do you want to provide any feedback (y/n)?")
+
+        return refined_rules
 
     # TODO: save the output into ODD format
