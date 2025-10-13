@@ -1,14 +1,13 @@
 from openai import OpenAI
 import os
 import json
-import requests
 
 
 class Literature_retrieval:
     def __init__(self, model_name="gpt-4o-mini"):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model_name = model_name
-        self.openALEX_api = api_key = os.getenv(
+        self.openALEX_api = os.getenv(
             "OPENALEX_API_KEY"
         )  # need to have an openalex api key and set as environment variable
 

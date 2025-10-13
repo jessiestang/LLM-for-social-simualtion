@@ -1,4 +1,5 @@
 from openai import OpenAI
+from docx import Document
 import json
 import os
 
@@ -91,15 +92,13 @@ class ModelConstructor:
         (4) select the most coherent rulesets and output them.
 
         You should think step-by-step and ensure that the rules are clear, concise, and logically sound.
-        Output strictly in JSON:
+        The output should be in JSON format and in academic report style
+        Output strictly in this structure:
         { 
-        "social theories and mechanisms":["theory 1 and mechanism1", "theory 2 andmechanism2", "..."],
-        "action rules": [
-            "IF condition THEN action",
-            "..."
-        ],
-        "explanations": ["explanation for mechanism1", "explanation for mechanism2", "..."]
-        "summation of how the model works": "..."
+        "problem context": summarize the problem context 2 sentences,
+        "model description": "A brief description of you proposed computational model in 2 sentences.",
+        "social theories and agent rules": "Give at least three social science theories and explain how they relate to problem context, in 3 sentences.",
+        "action rules": "Describe the agent action rules in detail, in 3-5 sentences.",
         }
         
         """
@@ -156,7 +155,7 @@ class ModelConstructor:
             print("LLM output not valid JSON, here’s raw output:")
             return response
 
-    def model_construction_pipeline(self, file_path: str):
+    def model_construction_pipeline(self, file_path: str, save_path: str):
         """
         This function provides a pipeline that:
         (1) extract problem definition from user input;
@@ -176,6 +175,7 @@ class ModelConstructor:
 
         # ask for user feedback and refine the model
         user_input = input("do you want to provide any feedback (y/n)?")
+        refined_rules = None
         while user_input.lower() == "y":
             user_feedback = input("please provide your feedback:")
             print("Step 3: Refining model based on user feedback...")
@@ -184,6 +184,32 @@ class ModelConstructor:
             print(refined_rules)
             user_input = input("do you want to provide any feedback (y/n)?")
 
-        return refined_rules
+        # save and export the conceptual model
+        print("Step 4: Saving and exporting the conceptual model...")
+        if refined_rules:
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(refined_rules, f, indent=2, ensure_ascii=False)  # save json output for code assistant
+            self.save_to_wordfile(refined_rules, save_path.replace(".json", ".docx"))  # save word file for users
+        else:
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(agent_rules, f, indent=2, ensure_ascii=False)  # save json output for code assistant
+            self.save_to_wordfile(agent_rules, save_path.replace(".json", ".docx"))  # save word file for users
+
+    def save_to_wordfile(self, model_description: str, file_path: str):
+        """
+        This function saves the model description and export it as a word file
+        """
+        doc = Document()
+        doc.add_heading("Conceptual Model Description", level=1)
+
+        # parse the model description
+        sections = json.loads(model_description)
+        for section, content in sections.items():
+            doc.add_heading(section.replace("_", " ").title(), level=2)
+            doc.add_paragraph(content)
+
+        doc.save(file_path)  # export to word file
+
+        print(f"Model description saved to {file_path}")
 
     # TODO: save the output into ODD format
