@@ -2,6 +2,7 @@ from openai import OpenAI
 from docx import Document
 import json
 import os
+import re
 
 
 class ModelConstructor:
@@ -75,7 +76,7 @@ class ModelConstructor:
                 "The response is not valid JSON. Please check the output format."
             )
         return features
-
+    
     def generate_agent_rules(self, features: str):
         """
         This llm agents generates agent rules based on the provided context.
@@ -87,26 +88,40 @@ class ModelConstructor:
         Your task is to analyze the context and help the researcher brainstorm potential mechanism and agent rules behind the problem context.
         You should perform the following steps:
         (1) Understand the agent's current situation based on the provided context.
-        (2) Brainstorm potential theoretical mechanisms that could guide agents' behaviors (at least 3).
-        (3) For each mechanism, determine the specific actions the agent would take in response to different conditions.
-        (4) select the most coherent rulesets and output them.
+        (2) Brainstorm three different kinds of model to simulate the situation.
+        (3) For each model, identify:
+            (a) At least three relevant social science theories that could inform the model design.
+            (b) At least three key mechanisms that drive agent behavior in the model.
+            (c) The specific rules that agents would follow for each mechanism, in response to different conditions.
 
         You should think step-by-step and ensure that the rules are clear, concise, and logically sound.
+        The specific rules should and model descriptions should be different for different models.
         The output should be in JSON format and in academic report style
-        Output strictly in this structure:
-        { 
+        Output strictly in this json output, specific each model with a title:
+        [{ 
+        "model 1 title": "A concise title for the first model",
         "problem context": summarize the problem context 2 sentences,
         "model description": "A brief description of you proposed computational model in 2 sentences.",
         "social theories and agent rules": "Give at least three social science theories and explain how they relate to problem context, in 3 sentences.",
-        "action rules": "Describe the agent action rules in detail, in 3-5 sentences.",
-        }
+        "action rules": "Describe the agent action rules in detail, in 3-5 sentences."},
+
+
+        {"model 2 title": "A concise title for the second model",
+        "problem context": ...,
+        "model description": ...,
+        ...},
+
+        {"model 3 title": "A concise title for the third model",
+        "problem context": ...,
+        "model description": ...,
+        ...}]
         
         """
 
         user_prompt = f"""
         please generate agent rules based on the problem definition {json.dumps(features, indent = 2)}.
         Think step-by-step and determine the agent's situation, and what steps the agent is going to take next.
-        Translate this reasoning into a small set of explicit if–then rules.
+        Think about three different kinds of models to simulate the situation.
         """
 
         # call the LLM model
@@ -122,10 +137,24 @@ class ModelConstructor:
         response = llm_model.choices[0].message.content
         try:
             rules = json.loads(response)
-            return json.dumps(rules, indent=2)
+            if isinstance(rules, dict):
+                rules = [rules]  # Ensure it's a list of models
+            elif isinstance(rules, list):
+                pass
+            else:
+                raise ValueError("The response is not a valid list or dictionary.")
+    
         except json.JSONDecodeError:
-            print("LLM output not valid JSON, here’s raw output:")
-            return response
+            match = re.search(r'\[.*\]', response, re.DOTALL)
+            if match:
+                rules = json.loads(match.group())
+                if isinstance(rules, dict):
+                    rules = [rules]  # Ensure it's a list of models
+                elif isinstance(rules, list):
+                    pass
+            else:
+                raise ValueError("LLM output not valid JSON, here’s raw output:")
+        return rules
 
     def refine_with_feedback(self, agent_rules: str, user_feedback: str):
         """
@@ -171,15 +200,19 @@ class ModelConstructor:
         print("Step 2: Generating agent rules based on problem definition...")
         agent_rules = self.generate_agent_rules(features)
         print("Generated agent rules:")
-        print(agent_rules)
+        print(json.dumps(agent_rules, indent=2, ensure_ascii=False))
 
         # ask for user feedback and refine the model
+        model_type = int(input("which model do you want to choose (1/2/3)?"))
+        selected_rules = agent_rules[model_type - 1]
+        selected_model = json.dumps(selected_rules, ensure_ascii=False, indent=2)   # select the chosen model
+
         user_input = input("do you want to provide any feedback (y/n)?")
         refined_rules = None
         while user_input.lower() == "y":
             user_feedback = input("please provide your feedback:")
             print("Step 3: Refining model based on user feedback...")
-            refined_rules = self.refine_with_feedback(agent_rules, user_feedback)
+            refined_rules = self.refine_with_feedback(selected_model, user_feedback)
             print("Refined agent rules:")
             print(refined_rules)
             user_input = input("do you want to provide any feedback (y/n)?")
@@ -192,8 +225,8 @@ class ModelConstructor:
             self.save_to_wordfile(refined_rules, save_path.replace(".json", ".docx"))  # save word file for users
         else:
             with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(agent_rules, f, indent=2, ensure_ascii=False)  # save json output for code assistant
-            self.save_to_wordfile(agent_rules, save_path.replace(".json", ".docx"))  # save word file for users
+                json.dump(selected_model, f, indent=2, ensure_ascii=False)  # save json output for code assistant
+            self.save_to_wordfile(selected_model, save_path.replace(".json", ".docx"))  # save word file for users
 
     def save_to_wordfile(self, model_description: str, file_path: str):
         """
@@ -212,4 +245,5 @@ class ModelConstructor:
 
         print(f"Model description saved to {file_path}")
 
-    # TODO: save the output into ODD format
+    #TODO: export in ODD format
+
