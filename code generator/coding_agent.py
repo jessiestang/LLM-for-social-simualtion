@@ -3,6 +3,7 @@ import os
 from openai import OpenAI
 import json
 import re
+import traceback
 
 class CodingAgent:
     def __init__(self, model_name="gpt-4o-mini"):
@@ -27,11 +28,15 @@ class CodingAgent:
         You will be given a json-format problem definition.
         Your jon is to generate a python file that implements the model described in the problem definition.
         The file should be as complete as possible, with all necessary imports, class definitions, and functions.
-        Provide each file clearly seperated by markers like:
-        [BEGIN FILE: model.py]
-        ...
-        [END FILE: model.py]
-        The code should be clean, well-commented, modular and runnable.
+        You file should contain at least following components:
+        - Agent class with agent types, attributes and methods
+        - Model class with scheduler, grid and interaction among agents
+        - Environment class with its attributes and methods
+        - Visualization class to collect data and make informed visualizations (do show the plot!)
+        - A main function to run the model
+        Do NOT provide any explanations or notes outside the code. Just provide the code.
+
+        Include a if __name__ == "__main__": block to run the model for a few steps, print key outputs, and show the visualizations for testing.
         """
 
         user_prompt = f"""
@@ -52,11 +57,88 @@ class CodingAgent:
 
         # parse the responses
         code = LLM_model.choices[0].message.content
+        code = code.replace("```python\n", "").strip() # remove unnecessary markdown formatting if any
+        code = code.replace("```", "").strip()
         with open("generated_model.py", "w") as f: # export to a python file
             f.write(code)
 
         return code
+    
+    def code_debugging(self, code):
+        """
+        This function will first run the generated code and identify any errors or issues.
+        It will return an error message to the code revision_module if any issues are found.
+        """
+        try:
+            exec(code)
+            return None # no error detected
+        except Exception as e:
+            return traceback.format_exc()
 
+    def code_revision(self, code, error_message):
+        """
+        This function will revise the code based on the provided error message.
+        """
+        # prompting the LLM
+        system_prompt = """
+        You are a coding assistant specialized in revising Python code for MESA-based agent-based models.
+        Your task is to revise the provided code based on the given error message.
+        Please ensure that the revised code is clean, well-commented, modular and runnable.
+        Do NOT provide any explanations or notes outside the code. Just provide the revised code.
+        """
+        user_prompt = f"""
+        Please revise the following code based on this error message: {error_message}.
+        Here is the original code:
+        {code}
+        """
+
+        # call the LLM
+        LLM_model = self.client.chat.completions.create(
+            model=self.model_name,
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.2,
+            max_tokens=1500
+        )
+
+        # parse the responses
+        revised_code = LLM_model.choices[0].message.content
+        revised_code = revised_code.replace("```python\n", "").strip() # remove unnecessary markdown
+        revised_code = revised_code.replace("```", "").strip()
+
+        return revised_code
+    
+    def run_pipeline(self,json_path):
+        """
+        This function runs the entire code generation pipeline."""
+        print("Step 1: Generating initial code based on the conceptual model...")
+        code = self.code_generation(json_path)
+        
+        print("Step 2: Debugging the generated code...")
+        error_message = self.code_debugging(code)
+        
+        iteration = 1
+        while error_message:
+            print(f"Error detected in iteration {iteration}:")
+            print(error_message)
+            print("Step 3: Revising the code based on the error message...")
+            code = self.code_revision(code, error_message)
+            
+            print("Re-debugging the revised code...")
+            error_message = self.code_debugging(code)
+            iteration += 1
+        
+        print("Step 4: Exporting code file...")
+        with open("generated_model.py", "w") as f: # export to a python file
+            f.write(code)
+        print("Code generation pipeline completed successfully.")
+
+
+
+
+ #TODO; Still need to figure out LLM Orchestration for master and sub-coding agents!!!
 class SubCodeAgents:
     def __init__(self, module_name, model_name="gpt-4o-mini"):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # set your API key in environment variable
@@ -79,7 +161,7 @@ class SubCodeAgents:
         conceptual_model = json.dumps(conceptual_model, indent=2)
 
         # prompting the LLM
-        system_prompt = """
+        system_prompt = f"""
         You are a coding assistant specialized in generating Python code for MESA-based agent-based models.
         Your task is to generate code for a specific component of the model.
         You will receive shared instructions and a conceptual model as input from the master agent.
@@ -88,11 +170,20 @@ class SubCodeAgents:
         Do not invent any new names or parameters, to ensure the compatibility with other code files.
         The code file should be clean, well-commented, modular and runnable.
         Do NOT provide any explanations or notes outside the code. Just provide the code for the specified module.
+
+        Only generate the code for the specified module: {self.module_name}, do not write the whole codebase.
+        If you are writing:
+        - agent.py: define the agent class with its attributes and methods.
+        - environment.py: define the environment setting and relevant functions.
+        - model.py: define the model class, scheduler, and interaction among agents, and between agents and the environment.
+        - run.py: set up the model parameters, initialize the model, and run the simulation loop.
+        - visualization.py: collect relevant data and statistics and make informative visualizations.
+        Only focus on your relevant module in {shared_instructions}.
         """
 
         user_prompt = f"""
         Please write up the MESA code for the {self.module_name} component based on the following shared instructions: {shared_instructions}.
-        The overall conceptual model is: {conceptual_model}.
+        The overall conceptual model is: {conceptual_model}. Please only generate the code for the specified module: {self.module_name}.
         Please stick strictly to {shared_instructions}. Do not invent any new names or parameters.
         """
 
@@ -126,6 +217,14 @@ class MasterAgent:
             "run.py": SubCodeAgents("run.py", model_name),
             "visualization.py": SubCodeAgents("visualization.py", model_name)
         }  # sub-coding agents of the master agent
+        self.sub_agents_role = {
+            "agent.py": "Responsible for generating the agent class with its attributes and methods.",
+            "environment.py": "Responsible for generating the environment setting and relevant functions.",
+            "model.py": "Responsible for generating the model class, scheduler, and interaction among agents, and between agents and the environment.",
+            "run.py": "Responsible for generating the setup of model parameters, initialization of the model, and running of the simulation.",
+            "visualization.py": "Responsible for generating the data collection and visualization functions."
+        } # pass on the role description to each sub-coding agent
+
     """
     The master agent supervises and coordinate the whole code generation process.
     Its task involves:
@@ -280,5 +379,3 @@ class MasterAgent:
         else:
             print("Code generation pipeline completed successfully.")
 
-#TODO: now each sub-coding agent is generating the same code, need to differentiate the role more clearly
-#TODO: need to implement a feedback loop for error correction
