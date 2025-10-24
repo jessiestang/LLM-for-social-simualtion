@@ -93,6 +93,11 @@ class ModelConstructor:
             (a) At least three relevant social science theories that could inform the model design.
             (b) At least three key mechanisms that drive agent behavior in the model.
             (c) The specific rules that agents would follow for each mechanism, in response to different conditions.
+        Three versions of model should differ in at least one of the following aspects:
+        (1) Experiment with different spatial structures (e.g., grid, network, continuous space).
+        (2) Vary agent decision-making processes (e.g., rational choice, bounded rationality, heuristics).
+        (3) Explore different interaction patterns (e.g., local interactions, global interactions, random interactions).
+        (4) Consider different adaptation and learning mechanisms.
 
         You should think step-by-step and ensure that the rules are clear, concise, and logically sound.
         The specific rules should and model descriptions should be different for different models.

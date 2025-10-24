@@ -1,0 +1,2 @@
+Please make a bar plot showing the ratio of satisfied agents at each step of simulation, with proper labels and title.
+Please make a static plot displaying the positions of agents on a 2D grid after the simulation, using different colors to represent satisfied and unsatisfied agents.

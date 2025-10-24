@@ -1,0 +1,3 @@
+We want to simulate a segregation situation with two groups of agents: type 1 and type 2. The agents are set in a lattice or other structured space.
+Each agent is surrounded by a certain number of neighbours (e.g., 8). We want to know what will affect their motivation to stay in their own neighbourhood or move to somewhere else.
+Think step-by-step under what conditions will agents change their location, and what are the main factors that influence such conditions.

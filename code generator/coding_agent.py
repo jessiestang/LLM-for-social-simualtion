@@ -4,6 +4,9 @@ from openai import OpenAI
 import json
 import re
 import traceback
+import tempfile
+import subprocess
+import sys
 
 class CodingAgent:
     def __init__(self, model_name="gpt-4o-mini"):
@@ -12,7 +15,7 @@ class CodingAgent:
 
     
     # first trial: generate only one python file based on problem definition
-    def code_generation(self, json_path):
+    def code_generation(self, json_path, user_requirements):
         """
         This coding agent will generate a python file written mainly with MESA framework
         based on the problem definition provided by the model construct assistant on
@@ -29,19 +32,25 @@ class CodingAgent:
         Your jon is to generate a python file that implements the model described in the problem definition.
         The file should be as complete as possible, with all necessary imports, class definitions, and functions.
         You file should contain at least following components:
-        - Agent class with agent types, attributes and methods
-        - Model class with scheduler, grid and interaction among agents
-        - Environment class with its attributes and methods
-        - Visualization class to collect data and make informed visualizations (do show the plot!)
+        - Agent class that adds, selects, shuffles agents and defines their attributes and methods
+        - Model class that activates agents, defines the event scheduler, collects agent and system data, and manages the overall model flow
+        - Space class that defines the space setting and store cell-level information
+        - Visualization class that makes informed plots (both static and interactive) (do show the plot!)
         - A main function to run the model
         Do NOT provide any explanations or notes outside the code. Just provide the code.
 
-        Include a if __name__ == "__main__": block to run the model for a few steps, print key outputs, and show the visualizations for testing.
+        Include a if __name__ == "__main__": block to run the model for a few steps, print key outputs, an
+        An example can be:
+        if __name__ == "__main__":
+            model = SocialModel(num_agents=100, width=10, height=10)
+            for i in range(5):
+                model.step()
         """
 
         user_prompt = f"""
         Please write up the code based on this conceptual model: {conceptual_model}
         Make sure to follow the instructions in the system prompt.
+        Taking into account the user requirements: {user_requirements}.
         """
 
         # call the LLM
@@ -68,12 +77,30 @@ class CodingAgent:
         """
         This function will first run the generated code and identify any errors or issues.
         It will return an error message to the code revision_module if any issues are found.
+        The input should be a python file?
         """
-        try:
-            exec(code)
-            return None # no error detected
-        except Exception as e:
-            return traceback.format_exc()
+        # write the code as a temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
+            temp_file.write(code)
+            temp_file_path = temp_file.name
+
+        # run the code in an isolated environment for testing
+        process = subprocess.Popen(
+            [sys.executable, temp_file_path],
+            stdout = subprocess.PIPE,
+            stderr = subprocess.PIPE,
+            text = True
+        )
+        stdout, stderr = process.communicate()
+
+        if process.returncode != 0: # error spotted, 0 for no error
+            print("Error detected during code execution:")
+            print(stderr)
+            return stderr  # return the error message
+        else:
+            print("No error detected")
+            print(stdout)
+            return None # no error message in this case
 
     def code_revision(self, code, error_message):
         """
@@ -109,13 +136,13 @@ class CodingAgent:
         revised_code = revised_code.replace("```", "").strip()
 
         return revised_code
-    
-    def run_pipeline(self,json_path):
+
+    def run_pipeline(self,json_path, user_requirements):
         """
         This function runs the entire code generation pipeline."""
         print("Step 1: Generating initial code based on the conceptual model...")
-        code = self.code_generation(json_path)
-        
+        code = self.code_generation(json_path, user_requirements)
+
         print("Step 2: Debugging the generated code...")
         error_message = self.code_debugging(code)
         
