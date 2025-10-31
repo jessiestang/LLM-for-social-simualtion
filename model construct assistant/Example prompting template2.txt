@@ -1,3 +1,4 @@
-We want to simulate a segregation situation with two groups of agents: type 1 and type 2. The agents are set in a lattice or other structured space.
-Each agent is surrounded by a certain number of neighbours (e.g., 8). We want to know what will affect their motivation to stay in their own neighbourhood or move to somewhere else.
-Think step-by-step under what conditions will agents change their location, and what are the main factors that influence such conditions.
+The Shelling segregation model simulates how agents of two types relocate based on neighbourhood composition.
+Agents move if the fraction of similar neighbors is below their tolerance threshold.
+Use this as a starting point, but also explore alternative formulations that might better reflect modern social processes.
+Example include economic inequality, but you are more encouraged to come up with your own idea.

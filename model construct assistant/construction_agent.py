@@ -11,7 +11,123 @@ class ModelConstructor:
             api_key=os.getenv("OPENAI_API_KEY")
         )  # set your API key in environment variable
         self.model_name = model_name  # default model
+    
+    def model_brainstorming(self, problem_context: str):
+        """
+        This llm agent will do three tasks:
+        (1) reconstruct the classic agent-based model based on the problem context provided by users;
+        (2) propose alternatives or novel variants of the classic model;
+        (3) validate suggestions by literature (to be implemented in future).
+        """
+        with open(problem_context, "r", encoding="utf-8") as file:
+            problem_definition = file.read()
+        
+        # prompt the LLM to brainstorm the actions of agents, and the motivations behind the actions
+        system_prompt = """
+        You are a researcher in computational social science and agent-based modeling.
+        You secialize in brainstorming how classic agent-based models can be extended to capture new social mechanisms.
+        You will be provided with a problem context.
+        You have three tasks. Please accomplish them step-by-step:
+        (1) Reconstruct the traditional agent-based model that best fits the problem context.
+        (2) Propose at least three novel extensions of the traditional model to better capture the social mechanisms in the problem context.
+        (3) For each proposed extension, provide literature references that support your suggestions.
 
+        For each version of model, please describe:
+        (1) key agents and their attributes;
+        (2) environment and interaction structure;
+        (3) expected emergent behaviors;
+        (4) theoretical justifications of extended rules from literature.
+        (5) why this new variant can yield new insights
+
+        Output strictly in JSON format:
+        [
+            {
+                "model_type": "baseline",
+                "name": "Model Name",
+                "description": "Clear description of the baseline model in 2-3 sentences.",
+                "key_agents": ["Agent_Type_1", "Agent_Type_2"],
+                "environment": "Description of the environment in 1-2 sentences.",
+                "interaction_structure": "How agents interact in 1-2 sentences.",
+                "behavior_rules": [
+                    "Rule 1: specific behavior description",
+                    "Rule 2: specific behavior description"
+                ],
+                "expected_emergent_behaviors": [
+                    "Behavior 1: what emerges",
+                    "Behavior 2: what emerges"
+                ]
+            },
+
+            {
+                "model_type": "extension",
+                "extension_id": "extension_1",
+                "name": "Extension Name",
+                "description": "What this extension adds to the baseline in 2-3 sentences.",
+                "key_agents": ["Agent_Type_1_variant", "Agent_Type_2_variant"],
+                "environment": "How the environment differs from baseline in 1-2 sentences.",
+                "interaction_structure": "How interactions differ from baseline in 1-2 sentences.",
+                "behavior_rules": [
+                    "New or modified rule 1",
+                    "New or modified rule 2"
+                ],
+                "expected_emergent_behaviors": [
+                    "New emergent behavior 1",
+                    "New emergent behavior 2"
+                ],
+                "theoretical_justifications": [
+                    "Author (Year): Key theory or finding that supports this extension",
+                    "Author (Year): Additional theoretical support"
+                ],
+                "why_insightful": "Explain why this extension provides new theoretical or practical insights in 2-3 sentences."
+            },
+            
+            {
+                "model_type": "extension",
+                "extension_id": "extension_2",
+                "name": "Second Extension Name",
+                "description": "What this second extension adds to the baseline in 2-3 sentences.",
+                "key_agents": ["Agent_Type_1_variant2", "Agent_Type_2_variant2"],
+                "environment": "How the environment differs from baseline in 1-2 sentences.",
+                "interaction_structure": "How interactions differ from baseline in 1-2 sentences.",
+                "behavior_rules": [
+                    "New or modified rule 1",
+                    "New or modified rule 2"
+                ],
+                "expected_emergent_behaviors": [
+                    "New emergent behavior 1",
+                    "New emergent behavior 2"
+                ],
+                "theoretical_justifications": [
+                    "Author (Year): Key theory or finding",
+                    "Author (Year): Additional support"
+                ],
+                "why_insightful": "Explain insights in 2-3 sentences."
+            }
+        ]
+
+        """
+        user_prompt = f"""The given problem context is:
+        {problem_definition}
+        Please brainstorm the model construction based on the three tasks mentioned above.
+        """
+        # call the LLM model
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        # parse the response to extract JSON
+        pb = response.choices[0].message.content
+        try:
+            rules = json.loads(pb)
+            return rules
+        except json.JSONDecodeError:
+            print(
+                "The response is not valid JSON. Please check the output format.")
+            return pb
+    
     def extract_problem_definition(self, file_path: str):
         """
         This llm agent reads the problem definition provided by users and extracts key information in json format
