@@ -41,70 +41,19 @@ class ModelConstructor:
 
         Output strictly in JSON format:
         [
-            {
-                "model_type": "baseline",
-                "name": "Model Name",
-                "description": "Clear description of the baseline model in 2-3 sentences.",
-                "key_agents": ["Agent_Type_1", "Agent_Type_2"],
-                "environment": "Description of the environment in 1-2 sentences.",
-                "interaction_structure": "How agents interact in 1-2 sentences.",
-                "behavior_rules": [
-                    "Rule 1: specific behavior description",
-                    "Rule 2: specific behavior description"
-                ],
-                "expected_emergent_behaviors": [
-                    "Behavior 1: what emerges",
-                    "Behavior 2: what emerges"
-                ]
-            },
-
-            {
-                "model_type": "extension",
-                "extension_id": "extension_1",
-                "name": "Extension Name",
-                "description": "What this extension adds to the baseline in 2-3 sentences.",
-                "key_agents": ["Agent_Type_1_variant", "Agent_Type_2_variant"],
-                "environment": "How the environment differs from baseline in 1-2 sentences.",
-                "interaction_structure": "How interactions differ from baseline in 1-2 sentences.",
-                "behavior_rules": [
-                    "New or modified rule 1",
-                    "New or modified rule 2"
-                ],
-                "expected_emergent_behaviors": [
-                    "New emergent behavior 1",
-                    "New emergent behavior 2"
-                ],
-                "theoretical_justifications": [
-                    "Author (Year): Key theory or finding that supports this extension",
-                    "Author (Year): Additional theoretical support"
-                ],
-                "why_insightful": "Explain why this extension provides new theoretical or practical insights in 2-3 sentences."
-            },
-            
-            {
-                "model_type": "extension",
-                "extension_id": "extension_2",
-                "name": "Second Extension Name",
-                "description": "What this second extension adds to the baseline in 2-3 sentences.",
-                "key_agents": ["Agent_Type_1_variant2", "Agent_Type_2_variant2"],
-                "environment": "How the environment differs from baseline in 1-2 sentences.",
-                "interaction_structure": "How interactions differ from baseline in 1-2 sentences.",
-                "behavior_rules": [
-                    "New or modified rule 1",
-                    "New or modified rule 2"
-                ],
-                "expected_emergent_behaviors": [
-                    "New emergent behavior 1",
-                    "New emergent behavior 2"
-                ],
-                "theoretical_justifications": [
-                    "Author (Year): Key theory or finding",
-                    "Author (Year): Additional support"
-                ],
-                "why_insightful": "Explain insights in 2-3 sentences."
-            }
+          {
+            "model_version": "traditional" or "extension_1" or "extension_2" or "extension_3",
+            "key_agents": ["agent1", "agent2", "..."],
+            "agent_attributes": ["attribute1", "attribute2", "..."],
+            "environment": "description of the environment",
+            "interaction_structure": "description of interaction structure",
+            "expected_emergent_behaviors": ["behavior1", "behavior2", "..."],
+            "theoretical_justifications": ["justification1", "justification2", "..."],
+            "literature_references": ["reference1", "reference2", "..."],
+            "insightfulness": "description of why this variant can yield new insights" #  extension only
+          },
+            ...
         ]
-
         """
         user_prompt = f"""The given problem context is:
         {problem_definition}
@@ -193,56 +142,63 @@ class ModelConstructor:
             )
         return features
     
-    def generate_agent_rules(self, features: str):
+    def model_generation_refining(self, features: str):
         """
-        This llm agents generates agent rules based on the provided context.
+        This llm agents refine the brainstorming ideas and transform it into concrete description of the model
         """
         # prompt the llm to generate agent rules
         system_prompt = """
         You are a helpful research assistant who specializes in constructing social simulation models based on provided context.
-        You will be provided with a context describing the agent's environment and characteristics.
-        Your task is to analyze the context and help the researcher brainstorm potential mechanism and agent rules behind the problem context.
-        You should perform the following steps:
-        (1) Understand the agent's current situation based on the provided context.
-        (2) Brainstorm three different kinds of model to simulate the situation.
-        (3) For each model, identify:
-            (a) At least three relevant social science theories that could inform the model design.
-            (b) At least three key mechanisms that drive agent behavior in the model.
-            (c) The specific rules that agents would follow for each mechanism, in response to different conditions.
-        Three versions of model should differ in at least one of the following aspects:
-        (1) Experiment with different spatial structures (e.g., grid, network, continuous space).
-        (2) Vary agent decision-making processes (e.g., rational choice, bounded rationality, heuristics).
-        (3) Explore different interaction patterns (e.g., local interactions, global interactions, random interactions).
-        (4) Consider different adaptation and learning mechanisms.
+        You will be provided with a short context of an agent-based model.
+        Your task is to dive deeper into the context and enlarge the context into a specific conceptual model for agent-based modeling.
+        Please strictly stick to the provided context and do not add any extra assumptions!!
 
-        You should think step-by-step and ensure that the rules are clear, concise, and logically sound.
-        The specific rules should and model descriptions should be different for different models.
-        The output should be in JSON format and in academic report style
-        Output strictly in this json output, specific each model with a title:
-        [{ 
-        "model 1 title": "A concise title for the first model",
-        "problem context": summarize the problem context 2 sentences,
-        "model description": "A brief description of you proposed computational model in 2 sentences.",
-        "social theories and agent rules": "Give at least three social science theories and explain how they relate to problem context, in 3 sentences.",
-        "action rules": "Describe the agent action rules in detail, in 3-5 sentences."},
+        You should follow these steps:
+        (1) Think about how the agents will be initialized. What attributes will they have? What actions can they perform?
+        (2) Consider the environment in which the agents operate. How is it structured? How do agents interact with each other and with the environment?
+        (3) Define the decision-making processes of the agents. How do they decide what actions to take based on their attributes and the state of the environment?
+        (4) Specify the rules that govern agent behavior. What conditions lead to specific actions? How do agents adapt or learn over time?
 
+        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
+        Start your response directly with { and end with }.
 
-        {"model 2 title": "A concise title for the second model",
-        "problem context": ...,
-        "model description": ...,
-        ...},
-
-        {"model 3 title": "A concise title for the third model",
-        "problem context": ...,
-        "model description": ...,
-        ...}]
-        
+        Your output should be in JSON format, clearly outlining the agent rules and model structure:
+        {
+            "agent_initialization": {
+                "attributes": ["attribute1", "attribute2", "..."],
+                "actions": ["action1", "action2", "..."],
+                "agent_types": ["type1", "type2", "..."],
+                "initial_distribution": "description of how agents are initially distributed",
+                "size of agents": "number of agents in the model",
+                "adaptation_mechanisms": "description of how agents adapt or learn over time"
+            },
+            "environment": {
+                "structure": "description of the environment structure",
+                "interactions": "description of agent-agent and agent-environment interactions",
+                "changes_over_time": "description of how the environment changes over time, and how agents influence these changes",
+                "key parameters": ["parameter1", "parameter2", "..."],
+            },
+            "decision_making_processes": ["process1", "process2", "..."],
+            "behavior_rules": [
+                "Rule 1: specific behavior description",
+                "Rule 2: specific behavior description",
+                "Rule 3: "...",
+                "..."
+            ],
+            "expected_emergent_behaviors": [
+                "Behavior 1: what emerges",
+                "Behavior 2: what emerges",
+                "..."
+            ]
+            }
+        Ensure your response is valid JSON that can be parsed by a JSON parser.
         """
 
         user_prompt = f"""
-        please generate agent rules based on the problem definition {json.dumps(features, indent = 2)}.
-        Think step-by-step and determine the agent's situation, and what steps the agent is going to take next.
-        Think about three different kinds of models to simulate the situation.
+        please construct a very detailed agent-based model based on this brainstorming idea {json.dumps(features, indent = 2)}.
+        Follow the steps mentioned in the system prompt to generate a comprehensive model description with clear agent rules.
+        Output ONLY the JSON object, no other text.
+        Please strictly stick to the provided context and do not add any extra assumptions!!
         """
 
         # call the LLM model
@@ -282,9 +238,9 @@ class ModelConstructor:
         This LLM agent reflects on the generated model rules and suggests improvements. It also takes users's feedback into account
         """
         # load user input
-        system_prompt = """You are a research assistant who specializes in social simulation models. You are given a set of model rules and user feedback.
-        Your task is to refine the model rules based on the feedback and your own reflection. Output the refined model rules in JSON format."""
-        user_prompt = f"""The given model rules are: {agent_rules}. The user feedback is: {user_feedback}. 
+        system_prompt = """You are a research assistant who specializes in social simulation models. You are given a description of agent-based model and user feedback.
+        Your task is to refine the conceptual model based on the feedback and your own reflection. Output the refined model rules in JSON format."""
+        user_prompt = f"""The given conceptual model is: {agent_rules}. The user feedback is: {user_feedback}. 
         Please refine the model rules based on the feedback and your own reflection. Output the refined model rules in JSON format."""
 
         # call the LLM model
@@ -308,46 +264,46 @@ class ModelConstructor:
     def model_construction_pipeline(self, file_path: str, save_path: str):
         """
         This function provides a pipeline that:
-        (1) extract problem definition from user input;
-        (2) generate agent rules based on problem definition;
+        (1) brainstorming model ideas based on problem definition;
+        (2) generate conceptual model based on brainstorming ideas;
+        (3) refine the model based on user feedback;
+        (4) save and export the conceptual model.
         """
         # first get the features
-        print("Step 1: Extracting problem definition from user input...")
-        features = self.extract_problem_definition(file_path)
-        print("Extracted features:")
-        print(json.dumps(features, indent=2))
+        print("Step 1: Brainstorming model ideas based on problem definition...")
+        model_ideas = self.model_brainstorming(file_path)
+        print("Brainstormed model ideas:")
+        print(json.dumps(model_ideas, indent=2))
+        idea_type = int(input("which model do you want to choose (1/2/3)?"))
+        selected_idea = model_ideas[idea_type - 1]
+        #TODO: enable human feedback here to regenerate ideas if needed
 
         # generate the agent rules
-        print("Step 2: Generating agent rules based on problem definition...")
-        agent_rules = self.generate_agent_rules(features)
-        print("Generated agent rules:")
-        print(json.dumps(agent_rules, indent=2, ensure_ascii=False))
-
-        # ask for user feedback and refine the model
-        model_type = int(input("which model do you want to choose (1/2/3)?"))
-        selected_rules = agent_rules[model_type - 1]
-        selected_model = json.dumps(selected_rules, ensure_ascii=False, indent=2)   # select the chosen model
+        print("Step 2: Generating the conceptual model based on the selected idea")
+        conceptual_model = self.model_generation_refining(selected_idea)
+        print("Generated conceptual model:")
+        print(json.dumps(conceptual_model, indent=2, ensure_ascii=False))
 
         user_input = input("do you want to provide any feedback (y/n)?")
-        refined_rules = None
+        refined_model = None
         while user_input.lower() == "y":
             user_feedback = input("please provide your feedback:")
             print("Step 3: Refining model based on user feedback...")
-            refined_rules = self.refine_with_feedback(selected_model, user_feedback)
-            print("Refined agent rules:")
-            print(refined_rules)
+            refined_model = self.refine_with_feedback(conceptual_model, user_feedback)
+            print("Refined conceptual model:")
+            print(refined_model)
             user_input = input("do you want to provide any feedback (y/n)?")
 
         # save and export the conceptual model
         print("Step 4: Saving and exporting the conceptual model...")
-        if refined_rules:
+        if refined_model:
             with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(refined_rules, f, indent=2, ensure_ascii=False)  # save json output for code assistant
-            self.save_to_wordfile(refined_rules, save_path.replace(".json", ".docx"))  # save word file for users
+                json.dump(refined_model, f, indent=2, ensure_ascii=False)  # save json output for code assistant
+            #self.save_to_wordfile(refined_model, save_path.replace(".json", ".docx"))
         else:
             with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(selected_model, f, indent=2, ensure_ascii=False)  # save json output for code assistant
-            self.save_to_wordfile(selected_model, save_path.replace(".json", ".docx"))  # save word file for users
+                json.dump(conceptual_model, f, indent=2, ensure_ascii=False)  # save json output for code assistant
+            #self.save_to_wordfile(conceptual_model, save_path.replace(".json", ".docx"))  # save word file for users
 
     def save_to_wordfile(self, model_description: str, file_path: str):
         """
@@ -356,14 +312,50 @@ class ModelConstructor:
         doc = Document()
         doc.add_heading("Conceptual Model Description", level=1)
 
-        # parse the model description
-        sections = json.loads(model_description)
-        for section, content in sections.items():
-            doc.add_heading(section.replace("_", " ").title(), level=2)
-            doc.add_paragraph(content)
+        # Handle both string and dict/list inputs
+        if isinstance(model_description, str):
+            sections = json.loads(model_description)
+        elif isinstance(model_description, (dict, list)):
+            sections = model_description
+        else:
+            raise ValueError(f"Unexpected type for model_description: {type(model_description)}")
+        
+            # Handle list of models
+        if isinstance(sections, list):
+            for i, model in enumerate(sections, 1):
+                doc.add_heading(f"Model {i}", level=1)
+                for section, content in model.items():
+                    doc.add_heading(section.replace("_", " ").title(), level=2)
+                    
+                    # Handle nested structures
+                    if isinstance(content, dict):
+                        for key, value in content.items():
+                            doc.add_paragraph(f"{key.replace('_', ' ').title()}: {value}")
+                    elif isinstance(content, list):
+                        for item in content:
+                            doc.add_paragraph(str(item), style='List Bullet')
+                    else:
+                        doc.add_paragraph(str(content))
+                
+                if i < len(sections):
+                    doc.add_page_break()
+        
+        # Handle single model (dict)
+        else:
+            for section, content in sections.items():
+                doc.add_heading(section.replace("_", " ").title(), level=2)
+                
+                # Handle nested structures
+                if isinstance(content, dict):
+                    for key, value in content.items():
+                        doc.add_paragraph(f"{key.replace('_', ' ').title()}: {value}")
+                elif isinstance(content, list):
+                    for item in content:
+                        doc.add_paragraph(str(item), style='List Bullet')
+                else:
+                    doc.add_paragraph(str(content))
 
-        doc.save(file_path)  # export to word file
-
+        doc.save(file_path)
         print(f"Model description saved to {file_path}")
 
     #TODO: export in ODD format
