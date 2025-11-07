@@ -25,7 +25,7 @@ class ModelConstructor:
         # prompt the LLM to brainstorm the actions of agents, and the motivations behind the actions
         system_prompt = """
         You are a researcher in computational social science and agent-based modeling.
-        You secialize in brainstorming how classic agent-based models can be extended to capture new social mechanisms.
+        You specialize in brainstorming how classic agent-based models can be extended to capture new social mechanisms.
         You will be provided with a problem context.
         You have three tasks. Please accomplish them step-by-step:
         (1) Reconstruct the traditional agent-based model that best fits the problem context.
@@ -40,20 +40,29 @@ class ModelConstructor:
         (5) why this new variant can yield new insights
 
         Output strictly in JSON format:
-        [
-          {
-            "model_version": "traditional" or "extension_1" or "extension_2" or "extension_3",
-            "key_agents": ["agent1", "agent2", "..."],
-            "agent_attributes": ["attribute1", "attribute2", "..."],
-            "environment": "description of the environment",
-            "interaction_structure": "description of interaction structure",
-            "expected_emergent_behaviors": ["behavior1", "behavior2", "..."],
-            "theoretical_justifications": ["justification1", "justification2", "..."],
-            "literature_references": ["reference1", "reference2", "..."],
+        [{
+            "model_version": "traditional" or "extension_1" or "extension_2",
+            "key_agents": "description of key agents",
+            "agent_attributes": "description of agent attributes",
+            "agent_actions": "description of actions agent can perform",
+            "environment": "description of the environment structure",
+            "interaction_structure": "description of interaction structure among agents and with environment",
+            "expected_emergent_behaviors": "description of expected emergent behaviors",
+            "theoretical_justifications": "use theories from literature to justify the extended rules",
             "insightfulness": "description of why this variant can yield new insights" #  extension only
           },
-            ...
-        ]
+        
+          {"model_version": "...",
+          "key_agents": "...",
+          "agent_attributes": "...",
+          ...
+          },
+
+          {"model_version": "...",
+          "key_agents": "...",
+          "agent_attributes": "...",
+          ...
+          }]
         """
         user_prompt = f"""The given problem context is:
         {problem_definition}
@@ -68,14 +77,28 @@ class ModelConstructor:
             ],
         )
         # parse the response to extract JSON
-        pb = response.choices[0].message.content
+        response = response.choices[0].message.content
         try:
-            rules = json.loads(pb)
-            return rules
+            rules = json.loads(response)
+            if isinstance(rules, dict):
+                rules = [rules]  # Ensure it's a list of models
+            elif isinstance(rules, list):
+                pass
+            else:
+                raise ValueError("The response is not a valid list or dictionary.")
+    
         except json.JSONDecodeError:
-            print(
-                "The response is not valid JSON. Please check the output format.")
-            return pb
+            match = re.search(r'\[.*\]', response, re.DOTALL)
+            if match:
+                rules = json.loads(match.group())
+                if isinstance(rules, dict):
+                    rules = [rules]  # Ensure it's a list of models
+                elif isinstance(rules, list):
+                    pass
+            else:
+                raise ValueError("LLM output not valid JSON, here’s raw output:")
+        return rules
+
     
     def extract_problem_definition(self, file_path: str):
         """
@@ -157,7 +180,11 @@ class ModelConstructor:
         (1) Think about how the agents will be initialized. What attributes will they have? What actions can they perform?
         (2) Consider the environment in which the agents operate. How is it structured? How do agents interact with each other and with the environment?
         (3) Define the decision-making processes of the agents. How do they decide what actions to take based on their attributes and the state of the environment?
+        You should define the decision-making processes strictly based on what you have in the agent initialization and environment setup.
         (4) Specify the rules that govern agent behavior. What conditions lead to specific actions? How do agents adapt or learn over time?
+        You should define the behavior rules strictly based on what you have in the agent initialization, environment setup, and decision-making processes.
+        (5) Finally, outline the expected emergent behaviors that arise from the interactions of agents within the environment.
+        This should be a direct consequence of the agent rules you have defined, plus a little bit reasoning and analysis.
 
         CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
         Start your response directly with { and end with }.
@@ -165,9 +192,9 @@ class ModelConstructor:
         Your output should be in JSON format, clearly outlining the agent rules and model structure:
         {
             "agent_initialization": {
-                "attributes": ["attribute1", "attribute2", "..."],
-                "actions": ["action1", "action2", "..."],
-                "agent_types": ["type1", "type2", "..."],
+                "attributes": ["attribute1", "attribute2", "attribute3"], # stick to this number for now
+                "actions": ["action1", "action2", "actin3"], # stick to this number for now
+                "agent_types": ["type1", "type2"], # stick to this number for now
                 "initial_distribution": "description of how agents are initially distributed",
                 "size of agents": "number of agents in the model",
                 "adaptation_mechanisms": "description of how agents adapt or learn over time"
@@ -176,15 +203,14 @@ class ModelConstructor:
                 "structure": "description of the environment structure",
                 "interactions": "description of agent-agent and agent-environment interactions",
                 "changes_over_time": "description of how the environment changes over time, and how agents influence these changes",
-                "key parameters": ["parameter1", "parameter2", "..."],
+                "key_parameters_that_controls_the_environment": ["parameter1", "parameter2"], # stick to this number for now
             },
             "decision_making_processes": ["process1", "process2", "..."],
             "behavior_rules": [
                 "Rule 1: specific behavior description",
                 "Rule 2: specific behavior description",
-                "Rule 3: "...",
-                "..."
-            ],
+                "Rule 3: specific behavior description",
+            ], # stick to this number for now
             "expected_emergent_behaviors": [
                 "Behavior 1: what emerges",
                 "Behavior 2: what emerges",
@@ -208,6 +234,7 @@ class ModelConstructor:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            temperature=0.2,
         )
 
         # parse the json response

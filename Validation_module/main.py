@@ -3,8 +3,8 @@ from validator import ModelValidation
 import os
 import json
 
-image_path = os.path.join(os.path.dirname(__file__),"..", "code generator") # test image path
+image_path = r"E:\LLM_for_abm\LLM-for-social-simualtion\code_generator\output_plots"
 print(image_path)
-conceptual_model = os.path.join ("..", "model construct assistant", "Conceptual Model.json")    
+conceptual_model = os.path.join ("..", "model_construct_assistant", "Conceptual Model.json")    
 vali = ModelValidation(model_name="gpt-4o-mini")
 vali.run_pipeline(image_path, conceptual_model)

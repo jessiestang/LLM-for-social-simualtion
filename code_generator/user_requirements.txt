@@ -1,0 +1,2 @@
+Please make a bar plot showing ratio of satisfaction levels of the system throughout the simulation time steps.
+Please make a static plot displaying the positions of agents on a 2D grid after the simulation, using different colors to represent satisfied and unsatisfied agents, and their types.

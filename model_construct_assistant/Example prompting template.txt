@@ -5,3 +5,4 @@ You have 3 neighbours of type 1 and 5 neighbours of type 2.
 Think step-by-step and determine whether you are happy or unhappy, and what steps you are going to take next.
 Agents are usually happy when a sufficient proportion of their neighbors are of the same type (e.g., 50% or more). 
 You can adjust this threshold if reasoning suggests so.
+

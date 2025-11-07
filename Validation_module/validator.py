@@ -1,6 +1,7 @@
 from openai import OpenAI
 import json
 import os, base64
+import re
 
 class ModelValidation():
     def __init__(self, model_name="gpt-4o-mini"): # the model needs to be able to accept image as input
@@ -39,10 +40,12 @@ class ModelValidation():
         The conceptual model will be a json file describing the structure and expected behaviors of the simulation.
         Output your analysis in this format:
         {
-        "Plot description": [describe the plot type and key patterns]
-        "Analysis": [detailed analysis of how the output aligns or deviates from the conceptual model]
-        "Suggestions": [specific suggestions for improving the model]
+        "Plot description": "describe the plot type and key patterns",
+        "Analysis": "detailed analysis of how the output aligns or deviates from the conceptual model",
+        "Suggestions": "specific suggestions for improving the model"
         }
+        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
+        Start your response directly with { and end with }.
         """
 
         user_prompt = f"""Here is the conceptual model description:{json.dumps(conceptual_model, indent=2)},
@@ -62,13 +65,14 @@ class ModelValidation():
         )
 
         # parse the response
-        response_content = LLM_response.choices[0].message.content
+        response = LLM_response.choices[0].message.content
         try:
-            analysis = json.loads(response_content)
+            feedback = json.loads(response)
+            return json.dumps(feedback, indent=2)
         except json.JSONDecodeError:
-            analysis = {"error": "Failed to parse LLM response", "response": response_content}
+            print("LLM output not valid JSON, here’s raw output:")
+            return response
 
-        return analysis
         
     def validation_suggestion(self, analysis, conceptual_model):
         """
@@ -92,11 +96,15 @@ class ModelValidation():
         Provide your suggestions in a structured format with clear headings for each section.
         Your output should be in this format:
         {
-        "Stochasticity Control": [detailed suggestions],
-        "Parameter Sensitivity Analysis": [detailed suggestions],
-        "Uncertainty Quantification": [detailed suggestions],
-        "Experimental Design": [detailed suggestions],
-        "External Validation": [detailed suggestions]}
+        "Stochasticity Control": "detailed suggestions",
+        "Parameter Sensitivity Analysis": "detailed suggestions",
+        "Uncertainty Quantification": "detailed suggestions",
+        "Experimental Design": "detailed suggestions",
+        "External Validation": "detailed suggestions"
+        }
+
+        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
+        Start your response directly with { and end with }.
         """
 
         user_prompt = f"""
@@ -117,13 +125,15 @@ class ModelValidation():
         )
 
         # parse the response
-        response_content = LLM_response.choices[0].message.content
+        # parse the response to extract JSON
+        response = LLM_response.choices[0].message.content
         try:
-            suggestions = json.loads(response_content)
+            suggestions = json.loads(response)
+            return json.dumps(suggestions, indent=2)
         except json.JSONDecodeError:
-            suggestions = {"error": "Failed to parse LLM response", "response": response_content}
-        
-        return suggestions
+            print("LLM output not valid JSON, here’s raw output:")
+            return response
+
     
     def run_pipeline(self, image_path, conceptual_model):
         """

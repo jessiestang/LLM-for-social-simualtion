@@ -36,6 +36,7 @@ class CodingAgent:
         - Model class that activates agents, defines the event scheduler, collects agent and system data, and manages the overall model flow
         - Space class that defines the space setting and store cell-level information
         - Visualization class that makes informed plots (both static and interactive) (do show the plot!)
+        - Save the plot to a local folder called "output_plots"
         - A main function to run the model
         Do NOT provide any explanations or notes outside the code. Just provide the code.
 
@@ -60,7 +61,7 @@ class CodingAgent:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.2,
+            temperature=0.3,
             max_tokens=1500
         )
 
@@ -126,7 +127,7 @@ class CodingAgent:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.2,
+            temperature=0.3,
             max_tokens=1500
         )
 
@@ -156,6 +157,10 @@ class CodingAgent:
             print("Re-debugging the revised code...")
             error_message = self.code_debugging(code)
             iteration += 1
+
+            if iteration > 5:  # limit the number of revision iterations to prevent infinite loops
+                print("Seems the LLM is trapped to a deadlock, needs manual revision of the code.")
+                break
         
         print("Step 4: Exporting code file...")
         with open("generated_model.py", "w") as f: # export to a python file
