@@ -1,7 +1,6 @@
 from openai import OpenAI
 import json
 import os, base64
-import re
 
 class ModelValidation():
     def __init__(self, model_name="gpt-4o-mini"): # the model needs to be able to accept image as input
@@ -17,13 +16,18 @@ class ModelValidation():
         It will give suggestions on the model based on the analysis.
         """
         # read a batch of images from a directory
-        image = []
+        image_contents = []
         for file in os.listdir(image_path):
             if file.endswith((".png", ".jpg", ".jpeg")):
                 with open(os.path.join(image_path, file), "rb") as img_file:
                     img_b64 = base64.b64encode(img_file.read()).decode("utf-8")
-                    image.append({"type": "image_url", "image_url": f"data:image/png;base64,{img_b64}"})
-       
+                    image_contents.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{img_b64}"
+                        }
+                    })
+        
         
         # prompting the LLM
         system_prompt = """
@@ -48,10 +52,16 @@ class ModelValidation():
         Start your response directly with { and end with }.
         """
 
-        user_prompt = f"""Here is the conceptual model description:{json.dumps(conceptual_model, indent=2)},
-        and here are the simulation output images: {image}.
-        Please provide your analysis following the instructons in the system prompt.
-        """ 
+        text_part = {
+        "type": "text",
+        "text": (
+            "Here is the conceptual model description:\n"
+            f"{json.dumps(conceptual_model, indent=2)}\n\n"
+            "Here are the simulation output images."
+        )
+        }
+
+        user_prompt = [text_part] + image_contents
 
         # call the LLM
         LLM_response = self.client.chat.completions.create(

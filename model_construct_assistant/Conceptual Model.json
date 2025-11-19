@@ -2,44 +2,47 @@
   {
     "agent_initialization": {
       "attributes": [
-        "agent_type",
-        "economic_status",
-        "income_level"
+        "ideology",
+        "attention_level",
+        "engagement_level"
       ],
       "actions": [
-        "move",
-        "assess_neighborhood",
-        "evaluate_opportunity"
+        "share_content",
+        "like_posts",
+        "follow_user"
       ],
       "agent_types": [
-        "A",
-        "B"
+        "left_leaning",
+        "right_leaning",
+        "neutral"
       ],
-      "initial_distribution": "Agents are randomly distributed across the grid with a mix of types A and B, reflecting a diverse initial socio-economic landscape.",
-      "size of agents": "100 agents in total, with 50 of type A and 50 of type B.",
-      "adaptation_mechanisms": "Agents adapt by reassessing their position based on changes in neighborhood composition and economic opportunities, allowing them to relocate if better options arise."
+      "initial_distribution": "Users are randomly distributed across the ideological spectrum with varying attention and engagement levels.",
+      "size of agents": "1000",
+      "adaptation_mechanisms": "Users adjust their attention and engagement levels based on the content they interact with and the behavior of their connections."
     },
     "environment": {
-      "structure": "A grid environment where each cell represents a location with varying economic indicators such as average income and job availability.",
-      "interactions": "Agents interact by observing their immediate neighbors' types and economic statuses, as well as the economic indicators of their current and potential new locations.",
-      "changes_over_time": "The economic indicators in the environment can change over time due to external factors, influencing agent decisions and potentially leading to shifts in neighborhood composition.",
+      "structure": "A complex network where each user is a node and edges represent social media connections between users.",
+      "interactions": "Users share content with their connections, and engagement with content is influenced by ideological similarity and attention levels.",
+      "changes_over_time": "The network evolves as users follow or unfollow others, and as content flows between users, potentially leading to shifts in ideological clusters.",
       "key_parameters_that_controls_the_environment": [
-        "average_income",
-        "job_availability"
+        "network_density",
+        "content_flow_rate"
       ]
     },
     "decision_making_processes": [
-      "Agents assess their current neighborhood composition and economic status before deciding to move.",
-      "Agents evaluate potential new locations based on the economic opportunities available and the composition of neighbors in those locations."
+      "Users assess the ideological alignment of content before engaging based on their own ideology.",
+      "Users evaluate their attention level to decide whether to engage with new content.",
+      "Users determine whether to follow or unfollow others based on the content shared by their connections."
     ],
     "behavior_rules": [
-      "Rule 1: If an agent's tolerance threshold for neighborhood composition is exceeded, they will consider moving to a new location.",
-      "Rule 2: If an agent identifies a location with higher average income and job availability, they will prioritize moving there over other locations.",
-      "Rule 3: Agents will remain in their current location if it meets their economic needs and their tolerance for neighborhood composition is satisfied."
+      "Rule 1: A user will engage with content if it aligns with their ideology and their attention level is above a certain threshold.",
+      "Rule 2: A user will share content if they have engaged with it and believe it will resonate with their followers.",
+      "Rule 3: A user will unfollow another user if they consistently share content that is ideologically opposed to their own."
     ],
     "expected_emergent_behaviors": [
-      "Behavior 1: The emergence of socio-economic clusters where agents of similar economic status and type congregate, leading to distinct neighborhoods.",
-      "Behavior 2: Increased economic stratification in neighborhoods, with wealthier agents clustering in high-income areas while lower-income agents settle in less desirable locations."
+      "Behavior 1: Clusters of like-minded individuals will form as users increasingly engage with ideologically similar content.",
+      "Behavior 2: Polarization will increase as users become more entrenched in their ideological beliefs due to selective exposure to content.",
+      "Behavior 3: The network will exhibit echo chamber effects, where users primarily interact with others who share their views."
     ]
   }
 ]

@@ -1,152 +1,143 @@
 import random
-import matplotlib.pyplot as plt
 import numpy as np
-import os
+import matplotlib.pyplot as plt
+import networkx as nx
 from mesa import Agent, Model
 from mesa.time import RandomActivation
-from mesa.space import MultiGrid
+from mesa.space import NetworkGrid
 from mesa.datacollection import DataCollector
 
-class EconomicAgent(Agent):
-    """An agent with economic status and decision-making capabilities."""
+class UserAgent(Agent):
+    """An agent representing a user in the social network."""
     
-    def __init__(self, unique_id, model, agent_type, economic_status, income_level):
+    def __init__(self, unique_id, model, ideology, attention_level, engagement_level):
         super().__init__(unique_id, model)
-        self.agent_type = agent_type
-        self.economic_status = economic_status
-        self.income_level = income_level
-        self.satisfaction = None
-
-    def move(self):
-        """Move to a new location if conditions are met."""
-        # Get neighboring POSITIONS (not agents)
-        neighbor_positions = self.model.grid.get_neighborhood(
-            self.pos, 
-            moore=True, 
-            include_center=False
-        )
-        
-        best_location = None
-        best_income = -1
-        
-        for neighbor_pos in neighbor_positions:
-            avg_income = self.model.get_average_income(neighbor_pos)
-            job_availability = self.model.get_job_availability(neighbor_pos)
-            
-            if (avg_income > self.income_level and 
-                job_availability > 0 and 
-                self.satisfaction < self.model.tolerance_threshold):
-                if avg_income > best_income:
-                    best_income = avg_income
-                    best_location = neighbor_pos
-        
-        if best_location is not None:
-            self.model.grid.move_agent(self, best_location)
-
-    def assess_neighborhood(self):
-        """Assess the neighborhood composition and economic status."""
-        # Get neighboring AGENTS
-        neighbors = self.model.grid.get_neighbors(
-            self.pos, 
-            moore=True, 
-            include_center=False
-        )
-        
-        satisfied_count = sum(1 for neighbor in neighbors if neighbor.economic_status == self.economic_status)
-        total_neighbors = len(neighbors)
-        
-        self.satisfaction = satisfied_count / total_neighbors if total_neighbors > 0 else 0
+        self.ideology = ideology
+        self.attention_level = attention_level
+        self.engagement_level = engagement_level
+        self.followers = set()
+        self.reposts = 0
 
     def step(self):
-        """Agent's step in the model."""
-        self.assess_neighborhood()
-        self.move()
+        # Simulate user actions
+        self.interact_with_network()
 
+    def interact_with_network(self):
+        neighbors = self.model.grid.get_neighbors(self.unique_id)
+        for neighbor in neighbors:
+            if self.should_engage(neighbor):
+                self.engage_with_content(neighbor)
+                self.share_content(neighbor)
 
-class EconomicModel(Model):
+    def should_engage(self, neighbor):
+        return (self.model.ideological_similarity(self.ideology, neighbor.ideology) and 
+                self.attention_level > random.random())
+
+    def engage_with_content(self, neighbor):
+        if self.ideology == neighbor.ideology:
+            self.reposts += 1
+
+    def share_content(self, neighbor):
+        if self.reposts > 0:
+            neighbor.followers.add(self)
+
+class SocialModel(Model):
     """A model with some number of agents."""
     
-    def __init__(self, num_agents, width, height):
-        self.num_agents = num_agents
-        self.grid = MultiGrid(width, height, True)
+    def __init__(self, N, network_density):
+        super().__init__()  # Initialize the Model superclass
+        self.num_agents = N
+        self.grid = NetworkGrid(nx.erdos_renyi_graph(N, network_density))
         self.schedule = RandomActivation(self)
-        self.data_collector = DataCollector(agent_reporters={"Satisfaction": "satisfaction"})
-        
-        # Create agents
-        for i in range(self.num_agents):
-            agent_type = 'A' if i < self.num_agents / 2 else 'B'
-            economic_status = random.choice(['low', 'medium', 'high'])
-            income_level = random.randint(1000, 5000)
-            agent = EconomicAgent(i, self, agent_type, economic_status, income_level)
-            self.schedule.add(agent)
-            x = self.random.randrange(self.grid.width)
-            y = self.random.randrange(self.grid.height)
-            self.grid.place_agent(agent, (x, y))
-
-        self.tolerance_threshold = 0.5
         self.datacollector = DataCollector(
-            agent_reporters={"Satisfaction": "satisfaction"}
+            agent_reporters={"ideology": "ideology", "followers": "followers", "reposts": "reposts"}
         )
 
+        # Create agents
+        ideologies = ['left_leaning', 'right_leaning', 'neutral']
+        for i in range(self.num_agents):
+            ideology = random.choice(ideologies)
+            attention_level = random.uniform(0, 1)
+            engagement_level = random.uniform(0, 1)
+            agent = UserAgent(i, self, ideology, attention_level, engagement_level)
+            self.schedule.add(agent)
+            self.grid.place_agent(agent, i)
+
     def step(self):
-        """Advance the model by one step."""
         self.datacollector.collect(self)
         self.schedule.step()
 
-    def get_average_income(self, pos):
-        """Calculate average income in a given cell."""
-        agents = self.grid.get_cell_list_contents([pos])
-        if len(agents) == 0:
+    def ideological_similarity(self, ideology1, ideology2):
+        return ideology1 == ideology2
+
+    def calculate_ei_index(self):
+        E, I = 0, 0
+        for agent in self.schedule.agents:
+            for follower in agent.followers:
+                if self.ideological_similarity(agent.ideology, follower.ideology):
+                    I += 1
+                else:
+                    E += 1
+        return (E - I) / (E + I) if (E + I) > 0 else 0
+
+    def calculate_gini_coefficient(self, attribute):
+        values = [len(agent.followers) if attribute == 'followers' else agent.reposts for agent in self.schedule.agents]
+        n = len(values)
+        if n == 0:
             return 0
-        return np.mean([agent.income_level for agent in agents])
+        sorted_values = np.sort(values)
+        index = np.arange(1, n + 1)
+        return 1 - (2 / n) * (np.sum((n + 1 - index) * sorted_values) / np.sum(sorted_values))
 
-    def get_job_availability(self, pos):
-        """Dummy function for job availability."""
-        return random.randint(0, 5)  # Random job availability for simplicity
+    def calculate_correlations(self):
+        followers = np.array([len(agent.followers) for agent in self.schedule.agents])
+        reposts = np.array([agent.reposts for agent in self.schedule.agents])
+        ideologies = np.array([agent.ideology for agent in self.schedule.agents])
+        
+        # Convert ideologies to numerical values for correlation
+        ideology_map = {'left_leaning': -1, 'neutral': 0, 'right_leaning': 1}
+        ideology_numeric = np.vectorize(ideology_map.get)(ideologies)
 
+        correlation_followers = np.corrcoef(ideology_numeric, followers)[0, 1]
+        correlation_reposts = np.corrcoef(ideology_numeric, reposts)[0, 1]
+
+        return correlation_followers, correlation_reposts
 
 class Visualization:
-    """Class for visualizing the model's results."""
+    """Class for visualizing the social network."""
     
     @staticmethod
-    def plot_satisfaction(data):
-        """Plot the satisfaction levels of agents over time."""
-        plt.figure(figsize=(10, 5))
-        plt.bar(range(len(data)), data, color='blue')
-        plt.xlabel('Time Steps')
-        plt.ylabel('Average Satisfaction Level')
-        plt.title('Satisfaction Levels Over Time')
-        plt.savefig("output_plots/satisfaction_levels.png")
-        plt.show()
-
-    @staticmethod
-    def plot_agents(model):
-        """Plot the positions of agents on a grid."""
-        grid = np.zeros((model.grid.width, model.grid.height))
+    def plot_network(model):
+        G = nx.Graph()
         for agent in model.schedule.agents:
-            if agent.satisfaction is not None:
-                if agent.satisfaction >= model.tolerance_threshold:
-                    grid[agent.pos[0], agent.pos[1]] = 1 if agent.agent_type == 'A' else 2
-        
-        plt.figure(figsize=(8, 8))
-        plt.imshow(grid, cmap='coolwarm', origin='upper')
-        plt.colorbar(ticks=[0, 1, 2], label='Agent Type (0: None, 1: A, 2: B)')
-        plt.title('Agent Positions on Grid')
-        plt.savefig("output_plots/agent_positions.png")
-        plt.show()
+            G.add_node(agent.unique_id, ideology=agent.ideology, followers=len(agent.followers))
+            for follower in agent.followers:
+                G.add_edge(agent.unique_id, follower.unique_id)
 
+        color_map = {'left_leaning': 'blue', 'neutral': 'gray', 'right_leaning': 'red'}
+        node_colors = [color_map[G.nodes[node]['ideology']] for node in G.nodes()]
+        node_sizes = [G.nodes[node]['followers'] * 10 for node in G.nodes()]  # Corrected line
+
+        plt.figure(figsize=(12, 12))
+        nx.draw(G, node_color=node_colors, node_size=node_sizes, with_labels=True, font_weight='bold', alpha=0.7)
+        plt.title("Social Network Visualization")
+        plt.savefig("output_plots/social_network.png")
+        plt.show()
 
 if __name__ == "__main__":
-    if not os.path.exists("output_plots"):
-        os.makedirs("output_plots")
-    
-    model = EconomicModel(num_agents=100, width=10, height=10)
-    satisfaction_data = []
-    
+    model = SocialModel(N=1000, network_density=0.05)  # Changed 'num_agents' to 'N'
     for i in range(10):
         model.step()
-        avg_satisfaction = np.mean([agent.satisfaction for agent in model.schedule.agents if agent.satisfaction is not None])
-        satisfaction_data.append(avg_satisfaction)
-    
-    Visualization.plot_satisfaction(satisfaction_data)
-    Visualization.plot_agents(model)
+
+    ei_index = model.calculate_ei_index()
+    gini_followers = model.calculate_gini_coefficient('followers')
+    gini_reposts = model.calculate_gini_coefficient('reposts')
+    correlation_followers, correlation_reposts = model.calculate_correlations()
+
+    print(f"E-I Index: {ei_index}")
+    print(f"Gini Coefficient of Followers: {gini_followers}")
+    print(f"Gini Coefficient of Reposts: {gini_reposts}")
+    print(f"Correlation between Partisanship and Number of Followers: {correlation_followers}")
+    print(f"Correlation between Partisanship and Repost Activity: {correlation_reposts}")
+
+    Visualization.plot_network(model)

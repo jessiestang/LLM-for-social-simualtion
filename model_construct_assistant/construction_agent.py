@@ -24,7 +24,7 @@ class ModelConstructor:
         
         # prompt the LLM to brainstorm the actions of agents, and the motivations behind the actions
         system_prompt = """
-        You are a researcher in computational social science and agent-based modeling.
+        You are a research assistant in computational social science and agent-based modeling.
         You specialize in brainstorming how classic agent-based models can be extended to capture new social mechanisms.
         You will be provided with a problem context.
         You have three tasks. Please accomplish them step-by-step:
@@ -38,6 +38,16 @@ class ModelConstructor:
         (3) expected emergent behaviors;
         (4) theoretical justifications of extended rules from literature.
         (5) why this new variant can yield new insights
+
+        Firstly, determine if user has provided any information in the problem context, regarding the 5 aspects mentioned above.
+        If they provide relevant information, please make sure to incorporate them into your model design (for both traditional and extended models).
+        If not, you can make reasonable assumptions based on your internal reasoning and external literature knowledge.
+        provide your reseasoning and assumptions clearly in your output. Examples of such reasoning could be:
+        "The problem context specifies the model structure: a lattice grid where agents interact with their immediate neighbors.
+        However, it does not define what types of neighbours will be used. I will suggest two types of neighbour structures: von Neumann and Moore neighbourhoods,
+        as they are commonly used in agent-based modeling literature"
+        "The problem context mentions that agents can have two actions: move or stay. I will incorporate this information into the agent action design."
+        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
 
         Output strictly in JSON format:
         [{
@@ -174,7 +184,8 @@ class ModelConstructor:
         You are a helpful research assistant who specializes in constructing social simulation models based on provided context.
         You will be provided with a short context of an agent-based model.
         Your task is to dive deeper into the context and enlarge the context into a specific conceptual model for agent-based modeling.
-        Please strictly stick to the provided context and do not add any extra assumptions!!
+        For baseline model, stick to the provided context strictly and do not add any extra assumptions.
+        For extended models, you can make reasonable extensions based on your internal reasoning and external literature knowledge.
 
         You should follow these steps:
         (1) Think about how the agents will be initialized. What attributes will they have? What actions can they perform?

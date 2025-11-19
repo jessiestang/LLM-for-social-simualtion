@@ -1,4 +1,3 @@
-The Shelling segregation model simulates how agents of two types relocate based on neighbourhood composition.
-Agents move if the fraction of similar neighbors is below their tolerance threshold.
-Use this as a starting point, but also explore alternative formulations that might better reflect modern social processes.
-Example include economic inequality, but you are more encouraged to come up with your own idea.
+We want to explore polarization propagation and attention inequality on a social media environment, using a complex network model. 
+The nodes represent the social media users, while the edges represent their online connection, and information flow. 
+For polarization progagtion, we may look at the ideological homophily in the network, attention distribution to different users, and users'engagement with polarizing content.

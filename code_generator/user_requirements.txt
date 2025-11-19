@@ -1,2 +1,8 @@
-Please make a bar plot showing ratio of satisfaction levels of the system throughout the simulation time steps.
-Please make a static plot displaying the positions of agents on a 2D grid after the simulation, using different colors to represent satisfied and unsatisfied agents, and their types.
+Please ensure that your algorithm can generate and collect data on the E-I index for measuring homophily, correlation between partisanship and number of followers, correlation between partisanship and repost activity, and Gini coefficients for the distributions of folloers and reposts.
+E-I index is defined as (E - I) / (E + I), where E is the number of edges connecting nodes of different ideologies, and I is the number of edges connecting nodes of the same ideologies.
+correlation between partisanship and number of followers is calculated using Pearson correlation coefficient.
+correlation between partisanship and repost activity is calculated using Pearson correlation coefficient.
+Gini coefficient is calculated using the formula G = 1 - (2 / n) * (Σ (n + 1 - i) * xi) / Σ xi, where n is the number of individuals, xi is the number of followers for individual i, and i is the rank of individual i when individuals are sorted in ascending order by their followers.
+Gini coefficient for repost activity is calculated similarly, replacing followers with repost counts.
+Print out the statistical results at the end of the simulation.
+Please plot a network graph where node colors represent partisanship and node sizes represent number of followers. Ensure the readability of the graph by adjusting node sizes and edge thicknesses appropriately.
