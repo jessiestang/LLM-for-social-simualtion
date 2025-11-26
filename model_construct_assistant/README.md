@@ -1,3 +1,4 @@
 Proposed Internal structure of model construction assistant
-<img width="812" height="610" alt="image" src="https://github.com/user-attachments/assets/16f079d3-62bf-46c5-b3b4-3d3b6d4a86db" />
+<img width="717" height="583" alt="image" src="https://github.com/user-attachments/assets/eed5c01f-0229-4057-8873-bccaa30480f5" />
+
 
