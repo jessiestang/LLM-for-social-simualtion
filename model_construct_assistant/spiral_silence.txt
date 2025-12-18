@@ -1,0 +1,22 @@
+*Research Topic:*
+Simulating the spiral of silence phenomenon in online social environments.
+
+*Context Description:*
+People fear social isolation and tend to remain silent if they perceive their opinion as being in the minority. In online spaces, users form perceptions of public opinion both from their immediate social connections (neighbours) and from what they see in mass or social media.
+
+*Agent Characteristics:*
+There are two types of agents — human users and LLM-driven agents. Each holds an opinion (0 or 1). Human users decide whether to express or remain silent based on their perceived majority opinion. LLM agents always express their opinions and post more frequently. 
+
+*Environment and Interactions:*
+Agents are arranged in a two-dimensional grid, each interacting with eight neighbours. The environment includes an external media. This media does these jobs at each timestep:
+(1) It collects all message spoken up by the agents
+(2) It make all messages available to all agents, so agents can determine the global opinion landscape based on that.
+
+*Additional Notes:*
+Three types of media will be tested:
+(1) No-intervention (publishes all messages),
+(2) Balanced (always shows 50–50 views),
+(3) Minority-boosted (slightly amplifies minority viewpoints).
+
+*Behavioral Decisions*:
+Human agents need to determine whether they want to speak-up or not at the current simulation step.

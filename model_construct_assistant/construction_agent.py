@@ -12,6 +12,247 @@ class ModelConstructor:
         )  # set your API key in environment variable
         self.model_name = model_name  # default model
     
+    def _safe_json_load(self, text: str):
+        """
+        Robustly try to parse JSON from LLM output.
+        Strategies:
+        1) Direct `json.loads`.
+        2) Extract the first {...} or [...] block and parse.
+        3) Escape backslashes in the extracted block and parse (helps with LaTeX like `\beta`).
+        Raises ValueError with the raw text when parsing ultimately fails.
+        """
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # Extract first JSON object/array block
+        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+        if match:
+            candidate = match.group(0)
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                # Try escaping single backslashes which commonly break JSON when LLM outputs LaTeX
+                escaped = candidate.replace("\\", "\\\\")
+                try:
+                    return json.loads(escaped)
+                except json.JSONDecodeError:
+                    pass
+
+        raise ValueError(f"LLM output not valid JSON. Raw output:\n{text}")
+    
+    def generate_decision_rule(self, problem_context:str):
+        """
+        This LLM agent will identify variables that influence the agent's behavior.
+        It will then shows how these variables affect agent's decision-making process together.
+        """
+        with open(problem_context, "r", encoding="utf-8") as file:
+            problem_definition = file.read()
+        
+        # system prompt
+        system_prompt = """
+        You are a computational social scientist specializing in agent-based modeling (ABM).
+        Your task is to formalize the decision-making process of agents within a predefined simulation setup
+        and express it as both mathematical equations and if–then rules.
+
+        You will be provided with:
+        - A description of the model context (e.g., the environment, agent types, and behavioral goal),
+        - The decision agents need to make,
+        - The relevant variables and parameters.
+
+        Your goal is to:
+        (1) Identify the variables that influence the agent’s decision,
+        (2) Describe how these variables interact to determine the agent’s perceived state,
+        (3) Express this relationship as an explicit formula,
+        (4) Translate that formula into clear if–then decision rules,
+        (5) Explain the behavioral or social reasoning behind each step.
+
+        Step 1: Variable Identification
+        List all variables that influence the decision. For each variable, specify:
+        - Name and meaning,
+        - Data type (e.g., Boolean, float, integer),
+        - How it is updated over time (update rule).
+
+        Step 2: Mechanistic Integration
+        Formulate a mathematical equation that combines these variables into a single “decision signal” variable (e.g., perceived support, payoff, or utility).
+        - Use proper mathematical notation (e.g., \( O_i^t = β S_i^l + (1−β) S_i^m \)).
+        - Define each symbol clearly.
+        - If parameters exist (e.g., β, α, θ), describe their range and role.
+
+        When constructing or updating equations, consider not only additive (linear) relationships 
+        but also multiplicative, interaction, and nonlinear effects where theoretically justified.
+
+        - Interaction terms (e.g., X * Y) can represent how one factor amplifies or moderates another.
+        - Nonlinear transformations (e.g., logistic, exponential, or squared terms) can represent thresholds or saturation effects.
+        - Temporal feedback (e.g., variable depends on its own past value) can represent learning or adaptation.
+
+        Prefer interpretable complexity: always explain what social mechanism each nonlinearity represents.
+
+        Step 3: Decision Rule Construction
+        Translate the equation into one or more explicit if–then statements.
+        Example:
+        IF perceived_majority > threshold THEN speak ELSE stay_silent.
+
+        Step 4: Reasoning
+        For each rule, explain briefly why this rule makes sense given the model context.
+
+        Output requirements:
+        - Output *only valid JSON* (no markdown, no text before or after).
+        - Use the following JSON schema strictly:
+        {
+        "decision_context": "what the agent is deciding",
+        "variables": [
+            {
+            "name": "variable_name",
+            "meaning": "what it represents conceptually",
+            "data_type": "data type (e.g., float, integer, boolean)",
+            "update_rule": "how it changes over time"
+            }
+        ],
+        "formula": {
+            "expression": "mathematical formula (use LaTeX notation if needed)",
+            "definitions": {
+            "symbol": "what it means and its range"
+            }
+        },
+        "decision_rules": [
+            {
+            "rule": "IF condition THEN action",
+            "explanation": "reasoning behind the rule"
+            }
+        ],
+        "parameters": {
+            "parameter_name": "description of its role and expected range"
+        },
+        "assumptions": [
+            "state any simplifying assumptions or constraints"
+        ]
+        }"""
+
+        # user prompt
+        user_prompt = f"""
+        The provided research context is {problem_definition}. Stick strictly to the requirement in the system prompt."""
+        
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        pb = response.choices[0].message.content
+        features = self._safe_json_load(pb)
+        return features
+
+    def human_in_the_loop(self, agent_rules: str, user_feedback: str):
+        """
+        Users can provide new ideas of potential variables they think will also be useful in explaining agents'decisions.
+        This LLM agent will try to see how it can also merge the proposed variable into existed design.
+        """
+        # load user input
+        system_prompt = """
+        You are a computational social scientist specializing in agent-based modeling (ABM).
+        Your task is to revise and extend an existing agent decision-making formulation,
+        based on new variables suggested by human researchers.
+
+        You will be provided with:
+        (1) A preliminary set of variables that affect agent behavior, along with their mathematical relationships.
+        (2) A list of additional variables proposed by human researchers.
+
+        Your goals are to:
+        1. Assign an appropriate data type, value range, and threshold logic to each newly proposed variable.
+        2. Analyze how these new variables might interact with the existing ones.
+        3. Integrate them into a new or revised mathematical formula that represents agent decision-making.
+        4. Translate the updated formula into explicit if–then decision rules.
+        5. Provide a short behavioral or social explanation for each rule.
+
+      
+        Step 1: Variable Definition
+        For each variable (both existing and new):
+        - Specify its name, conceptual meaning, data type (e.g., float, integer, Boolean),
+        - Its plausible range or domain,
+        - The logic that determines its threshold or triggering value.
+
+        Step 2: Relationship Formulation
+        Explain how the newly proposed variables influence the agent’s perception or decision-making process.
+
+        Step 3: Equation Construction
+        Write an updated mathematical equation that captures the relationships among all variables.
+        Use *LaTeX notation* for readability (e.g., \( O_i^t = βS_i^l + (1−β)S_i^m + γC_i \)).
+        Define each symbol precisely, including any new parameters introduced.
+
+        Step 4: Decision Rule Derivation
+        Translate the new or revised formula into one or more *if–then decision rules*
+
+        Step 5: Reasoning
+        For each rule, explain the behavioral or psychological mechanism that motivates it.
+
+        Output Requirements:
+        Return *only valid JSON* (no text outside the JSON object). Use this schema strictly:
+
+        {
+        "updated_variables": [
+            {
+            "name": "variable_name",
+            "meaning": "what it represents conceptually",
+            "data_type": "float / integer / boolean",
+            "range": "expected numerical range or domain",
+            "threshold_logic": "how it affects agent decision-making"
+            }
+        ],
+        "new_relationships": [
+            "short natural-language description of how new variables interact with existing ones"
+        ],
+        "updated_formula": {
+            "expression": "mathematical formula (in LaTeX notation)",
+            "definitions": {
+            "symbol": "what it means and its range"
+            }
+        },
+        "decision_rules": [
+            {
+            "rule": "IF condition THEN action",
+            "explanation": "why this rule makes behavioral sense"
+            }
+        ],
+        "assumptions": [
+            "state any simplifying assumptions or constraints introduced"
+        ]
+        }
+        """
+        user_prompt = f"""The previous design is: {agent_rules}. The user input: {user_feedback}. Stick strictly to the requirement in the system prompt.
+        """
+
+        # call the LLM model
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        pb = response.choices[0].message.content
+        features = self._safe_json_load(pb)
+        return features
+    
+    def export_descriptive_model(self, problem_context:str, preliminary_model:str, secondary_model:str = None):
+        """
+        This LLM agent will regorganize and export a complete and descriptive mechanistic model
+        based on the problem context, the preliminary decision-making part, and the secondar decision-making part,
+        if available.
+        """
+        with open(problem_context, "r", encoding="utf-8") as file:
+            problem_definition = file.read()
+        
+        system_prompt="""
+        You are a computational social scientist specializing in agent-based modeling (ABM).
+        Your task is to turn a few notes of a model design into a complete, descriptive and formal machanistic model design.
+        
+        """
+
+
+    
     def model_brainstorming(self, problem_context: str):
         """
         This llm agent will do three tasks:
@@ -60,6 +301,7 @@ class ModelConstructor:
             "expected_emergent_behaviors": "description of expected emergent behaviors",
             "theoretical_justifications": "use theories from literature to justify the extended rules",
             "insightfulness": "description of why this variant can yield new insights" #  extension only
+            "external_system": "if the user suggests the operation of an external system to the environment and agent"
           },
         
           {"model_version": "...",
@@ -110,70 +352,6 @@ class ModelConstructor:
         return rules
 
     
-    def extract_problem_definition(self, file_path: str):
-        """
-        This llm agent reads the problem definition provided by users and extracts key information in json format
-        """
-        # load problem definition given by users
-        with open(file_path, "r", encoding="utf-8") as file:
-            problem_definition = file.read()
-
-        # prompt the LLM to extract key information
-        system_prompt = """
-        You are a research assistant who specializes in social simulation models.
-        You are given a problem definition provided by users.
-        Your task is to extract key information from the problem definition, including:
-        1. types and roles of involved agents
-        2. environment and interaction structure
-        3. key behaviors and decision-making processes of agents
-        Output strictly in JSON format:
-        {
-          "agent_types": ["type1", "type2", "..."],
-          "environment": "description of the environment",
-          "interaction_structure": "description of interaction structure",
-          "key_behaviors": ["behavior1", "behavior2", "..."],
-          "decision_making_processes": ["process1", "process2", "..."],
-          ""key parameters": ["parameter1", "parameter2", "..."]
-        }
-        Ensure your response is valid JSON that can be parsed by a JSON parser.
-
-        Example
-        The given problem definition is:
-        "We want to model the voting behaviour of citizens in a democratic society.
-        Suppose there are two types of voters with different political preferences (+1 and -1).
-        Voters interact in a social network where they can influence each other's opinions.
-        Each voter decides whether to keep or change their opinin based on that of their neighbours."
-
-        The extracted key information should be:
-        {
-          "agent_types": ["type1: preference +1", "type2: preference -1"],
-          "environment": "Voters are placed in a social network",
-          "interaction_structure (among agents)": "voters can read opinions from their neighbours and influence each other",
-          "interaction_structure (with environment)": "N/A",
-          "key_behaviors": ["interacting with neighbours", "updating own opinion"],
-          "decision_making_processes": ["deciding whether to keep or change opinion based on neighbours' opinions"],
-          "key parameters": ["network structure", "initial opinion distribution", "threshold for opinion change"]
-        }
-        """
-        user_prompt = problem_definition
-
-        # call the LLM model
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        # parse the response to extract JSON
-        pb = response.choices[0].message.content
-        try:
-            features = json.loads(pb)
-        except json.JSONDecodeError:
-            raise ValueError(
-                "The response is not valid JSON. Please check the output format."
-            )
-        return features
     
     def model_generation_refining(self, features: str):
         """
@@ -271,33 +449,6 @@ class ModelConstructor:
                 raise ValueError("LLM output not valid JSON, here’s raw output:")
         return rules
 
-    def refine_with_feedback(self, agent_rules: str, user_feedback: str):
-        """
-        This LLM agent reflects on the generated model rules and suggests improvements. It also takes users's feedback into account
-        """
-        # load user input
-        system_prompt = """You are a research assistant who specializes in social simulation models. You are given a description of agent-based model and user feedback.
-        Your task is to refine the conceptual model based on the feedback and your own reflection. Output the refined model rules in JSON format."""
-        user_prompt = f"""The given conceptual model is: {agent_rules}. The user feedback is: {user_feedback}. 
-        Please refine the model rules based on the feedback and your own reflection. Output the refined model rules in JSON format."""
-
-        # call the LLM model
-        llm_model = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-
-        # parse the json response
-        response = llm_model.choices[0].message.content
-        try:
-            refined_rules = json.loads(response)
-            return json.dumps(refined_rules, indent=2)
-        except json.JSONDecodeError:
-            print("LLM output not valid JSON, here’s raw output:")
-            return response
 
     def model_construction_pipeline(self, file_path: str, save_path: str):
         """
@@ -342,6 +493,21 @@ class ModelConstructor:
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(conceptual_model, f, indent=2, ensure_ascii=False)  # save json output for code assistant
             #self.save_to_wordfile(conceptual_model, save_path.replace(".json", ".docx"))  # save word file for users
+    
+    def new_pipeline(self,file_path: str):
+        print("Step 1: Brainstorming model ideas based on problem definition...")
+        mechanistic_model = self.generate_decision_rule(file_path)
+        print(json.dumps(mechanistic_model, indent=2))
+        flag = input("Do you want to propose any new variable based on the current design? (y/n)")
+        while flag == "y":
+            user_input = input("Please provide name and a short definition of each new variable")
+            print("Step21: Generating new model ideas based on your input")
+            new_model = self.human_in_the_loop(json.dumps(mechanistic_model, indent=2), user_input)
+            print(json.dumps(new_model, indent=2))
+            flag = input("Do you want to propose any new variable based on the current design? (y/n)")
+
+
+        
 
     def save_to_wordfile(self, model_description: str, file_path: str):
         """
