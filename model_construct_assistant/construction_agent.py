@@ -72,7 +72,7 @@ class ModelConstructor:
         List all variables that influence the decision. For each variable, specify:
         - Name and meaning,
         - Data type (e.g., Boolean, float, integer),
-        - How it is updated over time (update rule).
+        - How it is updated over time (update rule and temporal scope: per time step, cumulative, or adaptive).
 
         Step 2: Mechanistic Integration
         Formulate a mathematical equation that combines these variables into a single “decision signal” variable (e.g., perceived support, payoff, or utility).
@@ -96,6 +96,15 @@ class ModelConstructor:
 
         Step 4: Reasoning
         For each rule, explain briefly why this rule makes sense given the model context.
+
+        Step 5: Identify externl systems that interact with agents, if available.
+        You can SKIP this step if no external system is identified, also in the output.
+        Only execute step 5 if it is clearly mentioned in the input file that there is an external system.
+        For each system:
+        - Specify what input it receives from agents;
+        - Specify how it processes that input;
+        - Specify what output it returns to agents;
+        - Determine the timing of interaction (before or after agent updates)
 
         Output requirements:
         - Output *only valid JSON* (no markdown, no text before or after).
@@ -127,7 +136,31 @@ class ModelConstructor:
         },
         "assumptions": [
             "state any simplifying assumptions or constraints"
-        ]
+        ],
+        "external_systems": [
+        {
+            "system_name": "name of the external system",
+            "inputs_from_agents": "what data or messages the system receives from agents",
+            "internal_variables": [
+            {
+                "name": "variable_name",
+                "meaning": "what it represents inside the system",
+                "update_rule": "how it updates over time (mathematical formula or aggregation rule)"
+            }
+            ],
+            "processing_logic": [
+            {
+                "rule": "explicit mathematical or algorithmic rule",
+                "description": "what this rule does and why it matters"
+            }
+            ],
+            "outputs_to_agents": [
+            {
+                "output_variable": "name of what is sent back to agents",
+                "generation_rule": "how it is computed from the system’s internal state",
+                "timing": "when it becomes available to agents (before/after their next decision)"
+            }
+            ]
         }"""
 
         # user prompt
@@ -247,79 +280,119 @@ class ModelConstructor:
         
         system_prompt="""
         You are a computational social scientist specializing in agent-based modeling (ABM).
-        Your task is to turn a few notes of a model design into a complete, descriptive and formal machanistic model design.
+        Your task is to transform short, partially specified model notes into a complete,
+        descriptive, and formal mechanistic model design suitable for implementation and analysis.
+
+        You will be provided with:
+        (1) A problem context file describing the research question, agent attributes, and environmental setup;
+        (2) A JSON file describing the agent decision context, behavioral rules, variables, thresholds, and model parameters.
+
+        Your goals are to:
+        - Produce a complete and structured model specification containing all necessary components for implementation;
+        - Include mathematical formulations of agent decision-making, using appropriate notation (LaTeX-style or inline);
+        - Provide a natural-language behavioral explanation corresponding to each equation or rule;
+        - Ensure that no new information or assumptions are introduced beyond what appears in the provided files.
+
+        Follow these steps carefully:
+
+        1. Identify all agent types, their attributes, and actions implied by the rules.
+        2. Define the environment (e.g., grid, network) and its parameters.
+        3. For each behavioral rule, provide both:
+        - the mathematical expression governing it,
+        - a verbal explanation in plain academic English,
+        - description of how variables in the mathematical expression are updated.
+        4. Summarize model-level mechanisms such as feedback loops or external influences.
+        5. List all simulation parameters, including agent population size, time steps, constants, and sensitivity parameters.
+        6. Provide a short academic-style description (4-5 sentences) summarizing the full model design.
+
+        Output strictly as *valid JSON* (no Markdown, no commentary).
+        Use the following schema exactly:
+
+        {
+        "model_title": "short descriptive title",
+        "overview": "brief purpose of the model",
+        "agents": {
+            "types": ["AgentType1", "AgentType2"],
+            "attributes": {
+            "AgentType1": ["attr1", "attr2"],
+            "AgentType2": ["attr1", "attr2"]
+            },
+            "actions": {
+            "AgentType1": ["action1", "action2"],
+            "AgentType2": ["action1", "action2"]
+            }
+        },
+        "environment": {
+            "structure": "description of environment (e.g., grid, network)",
+            "interaction_rules": "how agents interact with neighbours or the environment",
+            "parameters": {
+            "param1": "description of parameter 1",
+            "param2": "description of parameter 2"
+            }
+        },
+        "external_systems": [
+        {
+            "system_name": "name of the external system",
+            "inputs_from_agents": "what data or messages the system receives from agents",
+            "internal_variables": [
+            {
+                "name": "variable_name",
+                "meaning": "what it represents inside the system",
+                "update_rule": "how it updates over time (mathematical formula or aggregation rule)"
+            }
+            ],
+            "processing_logic": [
+            {
+                "rule": "explicit mathematical or algorithmic rule",
+                "description": "what this rule does and why it matters"
+            }
+            ],
+            "outputs_to_agents": [
+            {
+                "output_variable": "name of what is sent back to agents",
+                "generation_rule": "how it is computed from the system’s internal state",
+                "timing": "when it becomes available to agents (before/after their next decision)"
+            }
+            ],
+  
+        "decision_logic": {
+            "mathematical_expressions": [
+            {
+                "equation": "y_i(t) = β * x_i(t) + (1 - β) * m_i(t)",
+                "description": "brief explanation of what this equation means",
+                "variables":{
+                "variable_name_1": "descrpition of how the value of this variable can be obtained and updated",
+                "variable_name_2": "descrpition of how the value of this variable can be obtained and updated"
+                }
+            }
+            ],
+            "if_then_rules": [
+            {
+                "rule": "IF condition THEN action",
+                "explanation": "social or behavioral reasoning behind the rule"
+            }
+            ]
+        },
+        "simulation_parameters": {
+            "num_agents": "number of agents in the model",
+            "time_steps": "number of iterations to simulate",
+            "constants": {
+            "constant_name_1": "description of what this constant does",
+            "constant_name_2": "description of what this constant does"
+            }
+        },
+        "description_of_the_model": "A concise, academic summary (4-5 sentences) describing how the model operates and what emergent phenomena it captures."
+        }
+        """
+        if secondary_model:
+            user_prompt = f"""Here is the input problem context: {problem_definition},
+            and here are the JSON files describing the agents'behavior and decision-making {preliminary_model}, {secondary_model}.
+            Stick strictly to the instructions from the system prompt"""
+        else:
+            user_prompt = f"""Here is the input problem context: {problem_definition},
+            and here is the JSON file describing the agents'behavior and decision-making {preliminary_model}.
+            Stick strictly to the instructions from the system prompt"""
         
-        """
-
-
-    
-    def model_brainstorming(self, problem_context: str):
-        """
-        This llm agent will do three tasks:
-        (1) reconstruct the classic agent-based model based on the problem context provided by users;
-        (2) propose alternatives or novel variants of the classic model;
-        (3) validate suggestions by literature (to be implemented in future).
-        """
-        with open(problem_context, "r", encoding="utf-8") as file:
-            problem_definition = file.read()
-        
-        # prompt the LLM to brainstorm the actions of agents, and the motivations behind the actions
-        system_prompt = """
-        You are a research assistant in computational social science and agent-based modeling.
-        You specialize in brainstorming how classic agent-based models can be extended to capture new social mechanisms.
-        You will be provided with a problem context.
-        You have three tasks. Please accomplish them step-by-step:
-        (1) Reconstruct the traditional agent-based model that best fits the problem context.
-        (2) Propose at least three novel extensions of the traditional model to better capture the social mechanisms in the problem context.
-        (3) For each proposed extension, provide literature references that support your suggestions.
-
-        For each version of model, please describe:
-        (1) key agents and their attributes;
-        (2) environment and interaction structure;
-        (3) expected emergent behaviors;
-        (4) theoretical justifications of extended rules from literature.
-        (5) why this new variant can yield new insights
-
-        Firstly, determine if user has provided any information in the problem context, regarding the 5 aspects mentioned above.
-        If they provide relevant information, please make sure to incorporate them into your model design (for both traditional and extended models).
-        If not, you can make reasonable assumptions based on your internal reasoning and external literature knowledge.
-        provide your reseasoning and assumptions clearly in your output. Examples of such reasoning could be:
-        "The problem context specifies the model structure: a lattice grid where agents interact with their immediate neighbors.
-        However, it does not define what types of neighbours will be used. I will suggest two types of neighbour structures: von Neumann and Moore neighbourhoods,
-        as they are commonly used in agent-based modeling literature"
-        "The problem context mentions that agents can have two actions: move or stay. I will incorporate this information into the agent action design."
-        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
-
-        Output strictly in JSON format:
-        [{
-            "model_version": "traditional" or "extension_1" or "extension_2",
-            "key_agents": "description of key agents",
-            "agent_attributes": "description of agent attributes",
-            "agent_actions": "description of actions agent can perform",
-            "environment": "description of the environment structure",
-            "interaction_structure": "description of interaction structure among agents and with environment",
-            "expected_emergent_behaviors": "description of expected emergent behaviors",
-            "theoretical_justifications": "use theories from literature to justify the extended rules",
-            "insightfulness": "description of why this variant can yield new insights" #  extension only
-            "external_system": "if the user suggests the operation of an external system to the environment and agent"
-          },
-        
-          {"model_version": "...",
-          "key_agents": "...",
-          "agent_attributes": "...",
-          ...
-          },
-
-          {"model_version": "...",
-          "key_agents": "...",
-          "agent_attributes": "...",
-          ...
-          }]
-        """
-        user_prompt = f"""The given problem context is:
-        {problem_definition}
-        Please brainstorm the model construction based on the three tasks mentioned above.
-        """
         # call the LLM model
         response = self.client.chat.completions.create(
             model=self.model_name,
@@ -328,176 +401,16 @@ class ModelConstructor:
                 {"role": "user", "content": user_prompt},
             ],
         )
-        # parse the response to extract JSON
-        response = response.choices[0].message.content
-        try:
-            rules = json.loads(response)
-            if isinstance(rules, dict):
-                rules = [rules]  # Ensure it's a list of models
-            elif isinstance(rules, list):
-                pass
-            else:
-                raise ValueError("The response is not a valid list or dictionary.")
-    
-        except json.JSONDecodeError:
-            match = re.search(r'\[.*\]', response, re.DOTALL)
-            if match:
-                rules = json.loads(match.group())
-                if isinstance(rules, dict):
-                    rules = [rules]  # Ensure it's a list of models
-                elif isinstance(rules, list):
-                    pass
-            else:
-                raise ValueError("LLM output not valid JSON, here’s raw output:")
-        return rules
+        pb = response.choices[0].message.content
+        features = self._safe_json_load(pb)
+        return features
 
-    
-    
-    def model_generation_refining(self, features: str):
-        """
-        This llm agents refine the brainstorming ideas and transform it into concrete description of the model
-        """
-        # prompt the llm to generate agent rules
-        system_prompt = """
-        You are a helpful research assistant who specializes in constructing social simulation models based on provided context.
-        You will be provided with a short context of an agent-based model.
-        Your task is to dive deeper into the context and enlarge the context into a specific conceptual model for agent-based modeling.
-        For baseline model, stick to the provided context strictly and do not add any extra assumptions.
-        For extended models, you can make reasonable extensions based on your internal reasoning and external literature knowledge.
-
-        You should follow these steps:
-        (1) Think about how the agents will be initialized. What attributes will they have? What actions can they perform?
-        (2) Consider the environment in which the agents operate. How is it structured? How do agents interact with each other and with the environment?
-        (3) Define the decision-making processes of the agents. How do they decide what actions to take based on their attributes and the state of the environment?
-        You should define the decision-making processes strictly based on what you have in the agent initialization and environment setup.
-        (4) Specify the rules that govern agent behavior. What conditions lead to specific actions? How do agents adapt or learn over time?
-        You should define the behavior rules strictly based on what you have in the agent initialization, environment setup, and decision-making processes.
-        (5) Finally, outline the expected emergent behaviors that arise from the interactions of agents within the environment.
-        This should be a direct consequence of the agent rules you have defined, plus a little bit reasoning and analysis.
-
-        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
-        Start your response directly with { and end with }.
-
-        Your output should be in JSON format, clearly outlining the agent rules and model structure:
-        {
-            "agent_initialization": {
-                "attributes": ["attribute1", "attribute2", "attribute3"], # stick to this number for now
-                "actions": ["action1", "action2", "actin3"], # stick to this number for now
-                "agent_types": ["type1", "type2"], # stick to this number for now
-                "initial_distribution": "description of how agents are initially distributed",
-                "size of agents": "number of agents in the model",
-                "adaptation_mechanisms": "description of how agents adapt or learn over time"
-            },
-            "environment": {
-                "structure": "description of the environment structure",
-                "interactions": "description of agent-agent and agent-environment interactions",
-                "changes_over_time": "description of how the environment changes over time, and how agents influence these changes",
-                "key_parameters_that_controls_the_environment": ["parameter1", "parameter2"], # stick to this number for now
-            },
-            "decision_making_processes": ["process1", "process2", "..."],
-            "behavior_rules": [
-                "Rule 1: specific behavior description",
-                "Rule 2: specific behavior description",
-                "Rule 3: specific behavior description",
-            ], # stick to this number for now
-            "expected_emergent_behaviors": [
-                "Behavior 1: what emerges",
-                "Behavior 2: what emerges",
-                "..."
-            ]
-            }
-        Ensure your response is valid JSON that can be parsed by a JSON parser.
-        """
-
-        user_prompt = f"""
-        please construct a very detailed agent-based model based on this brainstorming idea {json.dumps(features, indent = 2)}.
-        Follow the steps mentioned in the system prompt to generate a comprehensive model description with clear agent rules.
-        Output ONLY the JSON object, no other text.
-        Please strictly stick to the provided context and do not add any extra assumptions!!
-        """
-
-        # call the LLM model
-        llm_model = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.2,
-        )
-
-        # parse the json response
-        response = llm_model.choices[0].message.content
-        try:
-            rules = json.loads(response)
-            if isinstance(rules, dict):
-                rules = [rules]  # Ensure it's a list of models
-            elif isinstance(rules, list):
-                pass
-            else:
-                raise ValueError("The response is not a valid list or dictionary.")
-    
-        except json.JSONDecodeError:
-            match = re.search(r'\[.*\]', response, re.DOTALL)
-            if match:
-                rules = json.loads(match.group())
-                if isinstance(rules, dict):
-                    rules = [rules]  # Ensure it's a list of models
-                elif isinstance(rules, list):
-                    pass
-            else:
-                raise ValueError("LLM output not valid JSON, here’s raw output:")
-        return rules
-
-
-    def model_construction_pipeline(self, file_path: str, save_path: str):
-        """
-        This function provides a pipeline that:
-        (1) brainstorming model ideas based on problem definition;
-        (2) generate conceptual model based on brainstorming ideas;
-        (3) refine the model based on user feedback;
-        (4) save and export the conceptual model.
-        """
-        # first get the features
-        print("Step 1: Brainstorming model ideas based on problem definition...")
-        model_ideas = self.model_brainstorming(file_path)
-        print("Brainstormed model ideas:")
-        print(json.dumps(model_ideas, indent=2))
-        idea_type = int(input("which model do you want to choose (1/2/3)?"))
-        selected_idea = model_ideas[idea_type - 1]
-        #TODO: enable human feedback here to regenerate ideas if needed
-
-        # generate the agent rules
-        print("Step 2: Generating the conceptual model based on the selected idea")
-        conceptual_model = self.model_generation_refining(selected_idea)
-        print("Generated conceptual model:")
-        print(json.dumps(conceptual_model, indent=2, ensure_ascii=False))
-
-        user_input = input("do you want to provide any feedback (y/n)?")
-        refined_model = None
-        while user_input.lower() == "y":
-            user_feedback = input("please provide your feedback:")
-            print("Step 3: Refining model based on user feedback...")
-            refined_model = self.refine_with_feedback(conceptual_model, user_feedback)
-            print("Refined conceptual model:")
-            print(refined_model)
-            user_input = input("do you want to provide any feedback (y/n)?")
-
-        # save and export the conceptual model
-        print("Step 4: Saving and exporting the conceptual model...")
-        if refined_model:
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(refined_model, f, indent=2, ensure_ascii=False)  # save json output for code assistant
-            #self.save_to_wordfile(refined_model, save_path.replace(".json", ".docx"))
-        else:
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(conceptual_model, f, indent=2, ensure_ascii=False)  # save json output for code assistant
-            #self.save_to_wordfile(conceptual_model, save_path.replace(".json", ".docx"))  # save word file for users
-    
-    def new_pipeline(self,file_path: str):
+    def new_pipeline(self,file_path: str, save_path:str):
         print("Step 1: Brainstorming model ideas based on problem definition...")
         mechanistic_model = self.generate_decision_rule(file_path)
         print(json.dumps(mechanistic_model, indent=2))
+
+        new_model = None
         flag = input("Do you want to propose any new variable based on the current design? (y/n)")
         while flag == "y":
             user_input = input("Please provide name and a short definition of each new variable")
@@ -505,9 +418,20 @@ class ModelConstructor:
             new_model = self.human_in_the_loop(json.dumps(mechanistic_model, indent=2), user_input)
             print(json.dumps(new_model, indent=2))
             flag = input("Do you want to propose any new variable based on the current design? (y/n)")
-
-
         
+        print("Step 3: Summarizing the modelling ideas...")
+        if new_model:
+            summary = self.export_descriptive_model(file_path, mechanistic_model, new_model)
+            print(summary)
+        else:
+            summary = self.export_descriptive_model(file_path, mechanistic_model)
+            print(summary)
+        
+        print("Step 4: Export the model...")
+        if summary:
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(summary, f, indent=2, ensure_ascii=False)
+         
 
     def save_to_wordfile(self, model_description: str, file_path: str):
         """

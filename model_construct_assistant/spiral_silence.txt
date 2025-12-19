@@ -8,11 +8,14 @@ People fear social isolation and tend to remain silent if they perceive their op
 There are two types of agents — human users and LLM-driven agents. Each holds an opinion (0 or 1). Human users decide whether to express or remain silent based on their perceived majority opinion. LLM agents always express their opinions and post more frequently. 
 
 *Environment and Interactions:*
-Agents are arranged in a two-dimensional grid, each interacting with eight neighbours. The environment includes an external media. This media does these jobs at each timestep:
+Agents are arranged in a two-dimensional grid, each interacting with eight neighbours. 
+
+*External System:*
+Media will act as an external system in this model
+This media does these jobs at each timestep:
 (1) It collects all message spoken up by the agents
 (2) It make all messages available to all agents, so agents can determine the global opinion landscape based on that.
 
-*Additional Notes:*
 Three types of media will be tested:
 (1) No-intervention (publishes all messages),
 (2) Balanced (always shows 50–50 views),
