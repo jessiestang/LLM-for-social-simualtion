@@ -29,7 +29,7 @@ class CodingAgent:
         system_prompt = """
         You are a research assistant in computational social science who specializes in python programming with MESA framework.
         You will be given a json-format problem definition.
-        Your jon is to generate a python file that implements the model described in the problem definition.
+        Your job is to generate a python file that implements the model described in the problem definition.
         The file should be as complete as possible, with all necessary imports, class definitions, and functions.
         You file should contain at least following components:
         - Agent class that adds, selects, shuffles agents and defines their attributes and methods
@@ -138,7 +138,7 @@ class CodingAgent:
 
         return revised_code
 
-    def run_pipeline(self,json_path, user_requirements):
+    def run_pipeline(self,json_path, user_requirements, output_path):
         """
         This function runs the entire code generation pipeline."""
         print("Step 1: Generating initial code based on the conceptual model...")
@@ -163,7 +163,7 @@ class CodingAgent:
                 break
         
         print("Step 4: Exporting code file...")
-        with open("generated_model.py", "w") as f: # export to a python file
+        with open(output_path, "w") as f: # export to a python file
             f.write(code)
         print("Code generation pipeline completed successfully.")
 

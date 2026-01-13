@@ -1,0 +1,17 @@
+*Research Topic:*
+Simulating the formation of racial segregation patterns in a closed urban environment
+
+*Context Description:*
+It is assumed that people prefer a homogenous neighbourhood setting.
+
+*Agent Characteristics:*
+There are two types of the agents with different racial identities. 
+The number of the two types of agents should be approximately the same.
+
+*Environment and Interactions:*
+Agents are arranged in a two-dimensional grid, each interacting with eight neighbours. 
+Initially, the agents should be randomly distributed in the grid.
+The grid should have about 25%-30% vacant spots that are not occupied by either types of agents
+
+*Behavioral Decisions*:
+At each timestep, all agents need to decide if they want to move to a random vacant spot in the grid.

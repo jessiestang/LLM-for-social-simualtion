@@ -1,0 +1,84 @@
+{
+  "model_title": "Racial Segregation Dynamics in Urban Environments",
+  "overview": "This model simulates the formation of racial segregation patterns among agents of different racial identities within a closed urban grid environment.",
+  "agents": {
+    "types": [
+      "AgentRacialType1",
+      "AgentRacialType2"
+    ],
+    "attributes": {
+      "AgentRacialType1": [
+        "homogeneity_preference",
+        "racial_composition_neighbor",
+        "vacant_spot_availability"
+      ],
+      "AgentRacialType2": [
+        "homogeneity_preference",
+        "racial_composition_neighbor",
+        "vacant_spot_availability"
+      ]
+    },
+    "actions": {
+      "AgentRacialType1": [
+        "decide_movement"
+      ],
+      "AgentRacialType2": [
+        "decide_movement"
+      ]
+    }
+  },
+  "environment": {
+    "structure": "A two-dimensional grid with a fixed size, containing both agents and vacant spots.",
+    "interaction_rules": "Agents assess their immediate eight neighbors in the grid to determine their racial composition and available vacant spots.",
+    "parameters": {
+      "grid_size": "The dimensions of the grid (e.g., 20 x 20 cells).",
+      "default_value_grid_size": "20",
+      "range_grid_size": "[10, 50]",
+      "vacancy_rate": "The percentage of grid cells occupied by vacant spots (25%-30%).",
+      "default_value_vacancy_rate": "0.25",
+      "range_vacancy_rate": "[0.25, 0.30]"
+    }
+  },
+  "external_systems": [],
+  "decision_logic": {
+    "mathematical_expressions": [
+      {
+        "equation": "decision_signal = \\alpha \\cdot racial_composition_neighbor + \\beta \\cdot vacant_spot_availability",
+        "description": "The decision signal calculates how appealing it is for an agent to move based on the racial composition of its neighborhood and the availability of vacant spots.",
+        "variables": {
+          "racial_composition_neighbor": "The proportion of neighboring agents that share the same racial identity, updated based on the current agent's eight neighbors.",
+          "default_value_racial_composition_neighbor": "0.5",
+          "range_racial_composition_neighbor": "[0, 1]",
+          "vacant_spot_availability": "The proportion of neighboring vacant spots available for the agent to move into, updated based on the presence of vacant neighbors.",
+          "default_value_vacant_spot_availability": "0.25",
+          "range_vacant_spot_availability": "[0, 1]",
+          "\\alpha": "Weight reflecting the importance of racial composition in decision-making, affecting how much the agent values being around same-race neighbors.",
+          "default_value_alpha": "0.6",
+          "range_alpha": "[0, 1]",
+          "\\beta": "Weight reflecting the importance of available vacant spots in decision-making.",
+          "default_value_beta": "0.4",
+          "range_beta": "[0, 1]"
+        }
+      }
+    ],
+    "if_then_rules": [
+      {
+        "rule": "IF decision_signal < homogeneity_preference THEN move ELSE stay",
+        "explanation": "This rule states that agents will seek to relocate to maintain or enhance their preference for a homogenous neighborhood. If the appeal of moving (decision_signal) is less than their preferred homogeneity level, they will decide to stay in place."
+      }
+    ]
+  },
+  "simulation_parameters": {
+    "num_agents": "40",
+    "time_steps": "100",
+    "constants": {
+      "initial_homogeneity_preference": "Constant preference level for neighborhood composition across all agents.",
+      "default_value_initial_homogeneity_preference": "0.7",
+      "range_initial_homogeneity_preference": "[0, 1]",
+      "update_frequency": "The frequency of neighborhood assessment and decision-making.",
+      "default_value_update_frequency": "1",
+      "range_update_frequency": "[1, 5]"
+    }
+  },
+  "description_of_the_model": "This agent-based model simulates agents of two different racial types interacting in a grid environment, where each agent prefers a neighborhood with a high proportion of same-race neighbors. The movement decisions are influenced by the racial composition of their surroundings and the availability of vacant spots. Through iterative updates, this model captures emerging patterns of racial segregation as agents continually assess their preferences against the social dynamics of their immediate neighborhoods."
+}

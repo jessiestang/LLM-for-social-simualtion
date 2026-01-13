@@ -69,16 +69,18 @@ class ModelConstructor:
         (5) Explain the behavioral or social reasoning behind each step.
 
         Step 1: Variable Identification
-        List all variables that influence the decision. For each variable, specify:
+        List two to three variables that influence the decision. For each variable, specify:
         - Name and meaning,
         - Data type (e.g., Boolean, float, integer),
         - How it is updated over time (update rule and temporal scope: per time step, cumulative, or adaptive).
+        - A reasonable default value based on theoretical considerations.
 
         Step 2: Mechanistic Integration
         Formulate a mathematical equation that combines these variables into a single “decision signal” variable (e.g., perceived support, payoff, or utility).
         - Use proper mathematical notation (e.g., \( O_i^t = β S_i^l + (1−β) S_i^m \)).
         - Define each symbol clearly.
         - If parameters exist (e.g., β, α, θ), describe their range and role.
+        - If parameters exist, suggest reasonable default values based on theoretical considerations.
 
         When constructing or updating equations, consider not only additive (linear) relationships 
         but also multiplicative, interaction, and nonlinear effects where theoretically justified.
@@ -116,7 +118,9 @@ class ModelConstructor:
             "name": "variable_name",
             "meaning": "what it represents conceptually",
             "data_type": "data type (e.g., float, integer, boolean)",
-            "update_rule": "how it changes over time"
+            "update_rule": "how it changes over time",
+            "default_value": "a reasonable default value",
+            "range": "expected numerical range or domain"
             }
         ],
         "formula": {
@@ -132,7 +136,8 @@ class ModelConstructor:
             }
         ],
         "parameters": {
-            "parameter_name": "description of its role and expected range"
+            "parameter_name": "description of its role and expected range",
+            "default_value": "suggestion of a reasonable default value based on theoretical considerations"
         },
         "assumptions": [
             "state any simplifying assumptions or constraints"
@@ -303,6 +308,7 @@ class ModelConstructor:
         - description of how variables in the mathematical expression are updated.
         4. Summarize model-level mechanisms such as feedback loops or external influences.
         5. List all simulation parameters, including agent population size, time steps, constants, and sensitivity parameters.
+        6. Make sure that all variables and parameters have a reasonable default value and range (or domain).
         6. Provide a short academic-style description (4-5 sentences) summarizing the full model design.
 
         Output strictly as *valid JSON* (no Markdown, no commentary).
@@ -327,7 +333,11 @@ class ModelConstructor:
             "interaction_rules": "how agents interact with neighbours or the environment",
             "parameters": {
             "param1": "description of parameter 1",
-            "param2": "description of parameter 2"
+            "default_value_variable_name_1": "a reasonable default value",
+            "range_variable_name_1": "expected numerical range or domain",
+            "param2": "description of parameter 2",
+            "default_value_variable_name_2": "a reasonable default value",
+            "range_variable_name_2": "expected numerical range or domain",
             }
         },
         "external_systems": [
@@ -362,7 +372,11 @@ class ModelConstructor:
                 "description": "brief explanation of what this equation means",
                 "variables":{
                 "variable_name_1": "descrpition of how the value of this variable can be obtained and updated",
-                "variable_name_2": "descrpition of how the value of this variable can be obtained and updated"
+                "default_value_variable_name_1": "a reasonable default value",
+                "range_variable_name_1": "expected numerical range or domain",
+                "variable_name_2": "descrpition of how the value of this variable can be obtained and updated",
+                "default_value_variable_name_2": "a reasonable default value",
+                "range_variable_name_2": "expected numerical range or domain"
                 }
             }
             ],
@@ -378,7 +392,11 @@ class ModelConstructor:
             "time_steps": "number of iterations to simulate",
             "constants": {
             "constant_name_1": "description of what this constant does",
-            "constant_name_2": "description of what this constant does"
+            "default_value_constant_name_1": "a reasonable default value of this constant",
+            "range_constant_name_1": "expected numerical range or domain of this constant",
+            "constant_name_2": "description of what this constant does",
+            "default_value_constant_name_2": "a reasonable default value of this constant",
+            "range_constant_name_2": "expected numerical range or domain of this constant"
             }
         },
         "description_of_the_model": "A concise, academic summary (4-5 sentences) describing how the model operates and what emergent phenomena it captures."
