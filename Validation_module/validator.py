@@ -74,6 +74,14 @@ class ModelValidation():
         self.llm_context = LLMContext(model_name=model_name)
         self.model_name = model_name
 
+    def register_tools(self, external_tools):
+        """
+        This function will register external tools for the LLM agent to use during validation.
+        Tools can include dataset search, statistical analysis, visualization, etc.
+        The tool functions will be implemented later.
+        """
+        self.external_tools = external_tools
+        
     def output_analysis(self, image_path, conceptual_model):
         """
         This function sends the image output from the simulation, together with the conceptual model to LLM.
@@ -148,13 +156,13 @@ class ModelValidation():
             return response
 
         
-    def evaluation_suggestion(self, analysis, conceptual_model):
+    def evaluation_suggestion(self, conceptual_model):
         """
         This function will give specific suggestions on how to evaluate the model,
         based on the conceptual model and the output analysis from LLM.
         """
         conceptual_model = json.dumps(conceptual_model, indent=2)
-        output_analysis = json.dumps(analysis, indent=2)
+        # output_analysis = json.dumps(analysis, indent=2)
 
         # prompt the LLM
         system_prompt = """
@@ -166,46 +174,57 @@ class ModelValidation():
         Be specific about the methods to use, the number of simulation runs needed, and the reasoning behind your suggestions.
         Also state what you expect to observe if the stochasticity is well controlled.
         Write in detailed steps on how to implement it.
-        An example can be: "To control for stochasticity, we can use a Monte Carlo approach by running the simulation [a number] times with different random seeds.
+        An example can be: "To control for stochasticity, we can use a [approach name] approach by running the simulation [a number] times with different random seeds.
         This will help us capture the variability in the outputs due to randomness. We can then compute the mean and standard deviation of key output metrics across these runs to assess stability.
         If stochasticity is well controlled, we expect the standard deviation of output metric X to be below a certain threshold, say [a number].
-        We can verify this by plotting the distribution of output metric X across all runs and checking for convergence."
+        The metric X is defined as [definition based on conceptual model or internal reasoning], and can be measured by [detailed steps].
+        We can verify this by plotting [suggestions for visualization]. This approach is suitable because [a reason]."
 
         2. Parameter Sensitivity Analysis: Which parameters to vary and how to assess their impact on the outputs.
         Suggested parameters should be from the conceptual model. DO NOT invent any new parameter yourself here.
         Be very specific about the range of values for analysis of each parameter, based on your internal reasoning.
         Be very specific about the approach to the sensitivity analysis. Do not just mention the name, but provide reason on why this approach,
-        and detailed steps on how to implement it.
+        and detailed steps on how to implement it. If the output metrics is not mentioned in the conceptual model, define the conceptual model and explain how that would be measured.
         Also give some suggestions on how to evaluate the impact of those parameters on the outputs.
-        An example can be: "To analyze the sensitivity of parameter X, which ranges from [a number] to [a number], we can use a one-at-a-time (OAT) approach. 
+        An example can be: "To analyze the sensitivity of parameter X, which ranges from [a number] to [a number], we can use a [approach name] approach. 
         We will vary parameter X in increments of [a number] while keeping other parameters constant, and run [a number] simulation iterations for each value to observe the changes in output metric Y.
-        We will then plot the results to visualize the sensitivity."
+        The output metric Y is defined as [definition based on conceptual model or internal reasoning], and can be measured by [detailed steps].
+        We will then visualize the sensitivity by plotting [suggestions for visualization]. This approach is suitable because [a reason]."
 
         3. Uncertainty Quantification: What metrics and statistical methods can be used to quantify uncertainty in the outputs, and how to compute them.
-        Give reasons about why those metrics are suitable for this model, and how to compute them based on the conceptual model structure.
-        An example can be: "To quantify uncertainty in output metric Z, we can compute the [a percentage] confidence interval using bootstrapping. 
+        Give reasons about why those metrics are suitable for this model, and how to compute them based on the conceptual model structure. 
+        If the output metrics is not mentioned in the conceptual model, define the conceptual model and explain how that would be measured.
+        An example can be: "To quantify uncertainty in output metric Z, we can compute the [a percentage] confidence interval using [a statistical method]. 
         This involves resampling the simulation outputs with replacement [a number] times and calculating the interval from the resulting distribution. 
-        This method is suitable because it does not assume a specific distribution for the outputs, which aligns with the stochastic nature of the model."
+        This method is suitable because [a reason]. Here the output metric Z is defined as [definition based on conceptual model or internal reasoning].
+        This metric can be computed by [detailed steps]."
 
         4. Experimental Design: Based on the above three sections, provide a concise experimental design plan summarizing the key steps to implement the evaluation.
         Give concrete steps on how to carry out the experiment, including the number of simulation runs, parameter settings, and analysis methods.
         An example can be:" To implement the evaluation, we will first conduct stochasticity control by running the simulation [a number] times with varied random seeds.
-        Next, we will perform parameter sensitivity analysis on parameters X and Y using the OAT approach, varying each in specified ranges while keeping others constant.
-        Finally, we will quantify uncertainty in output metric Z using bootstrapping to compute the [a percentage] confidence interval.
+        Next, we will perform parameter sensitivity analysis on parameters X and Y using the [approach name] approach, varying each in specified ranges while keeping others constant.
+        Finally, we will quantify uncertainty in output metric Z using [a statistical method] to compute the [a percentage] confidence interval.
         The entire experiment will involve a total of [a number] simulation runs."
         Your output should be in this format:
-        {
-        "Stochasticity Control": "detailed suggestions",
-        "Parameter Sensitivity Analysis": "detailed suggestions",
-        "Uncertainty Quantification": "detailed suggestions",
-        }
+        [
+        {"strategy_id": "1",
+        "strategy_type": "Stochasticity Control",
+        "description": "detailed suggestions"},
+
+        {"strategy_id": "2",
+        "strategy_type": "Parameter Sensitivity Analysis",
+        "description": "detailed suggestions"},
+
+        {"strategy_id": "3",
+        "strategy_type": "Uncertainty Quantification",
+        "description": "detailed suggestions"},
+        ]
 
         CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
-        Start your response directly with { and end with }.
+        Start your response directly with [ and end with ].
         """
 
         user_prompt = f"""
-        Here is the analysis of the simulation outputs: {output_analysis}.
         Based on the conceptual model and output_analysis,
         please provide your evaluation suggestions following the instructions in the system prompt.
         """
@@ -221,15 +240,28 @@ class ModelValidation():
         )
 
         # parse the response
-        # parse the response to extract JSON
         response = LLM_response.choices[0].message.content
         try:
-            suggestions = json.loads(response)
-            return json.dumps(suggestions, indent=2)
+            rules = json.loads(response)
+            if isinstance(rules, dict):
+                rules = [rules]  # Ensure it's a list of models
+            elif isinstance(rules, list):
+                pass
+            else:
+                raise ValueError("The response is not a valid list or dictionary.")
+    
         except json.JSONDecodeError:
-            print("LLM output not valid JSON, here’s raw output:")
-            return response
-
+            match = re.search(r'\[.*\]', response, re.DOTALL)
+            if match:
+                rules = json.loads(match.group())
+                if isinstance(rules, dict):
+                    rules = [rules]  # Ensure it's a list of models
+                elif isinstance(rules, list):
+                    pass
+            else:
+                raise ValueError("LLM output not valid JSON, here’s raw output:")
+        return rules
+    
     def rq_driven_experimental_design(self, conceptual_model): #TODO: maybe need to move this part to another module
         """ 
         This function will help design the experiment plan keep the ABM fixed and explore theoretical dynamics.
@@ -284,14 +316,110 @@ class ModelValidation():
             return response
 
     
-    def dataset_finding(self):
+    def dataset_finding(self, keywords):
         """
         This function will search for relevant datasets for model validation using DuckDuckGo API or other dataset repositories.
-        The search function will be implemented as an external tool later.
+        The dataset search function will be implemented as an external tool later.
+        """
+        system_prompt = """
+        You are a research assistant that helps find relevant datasets for validating computational social science simulation models.
+        Given a conceptual model, identify potential real-world datasets that can be used for validation and experiments.
+        You are equipped with a dataset search tool, which searches for datasets using DuckDuckGo API based on the extracted keywords.
+        Use the tools as needed to find relevant datasets.
+        Your output should include:
+        1. Dataset Name: The name of the dataset.
+        2. Description: A brief description of the dataset and its relevance to the conceptual model.
+        3. Source/Link: A URL or reference to where the dataset can be accessed.
+        
+        Please return the top 3 most relevant datasets. Your output should be in this format:
+        [{
+        "Dataset Name": "name",
+        "Description": "description",
+        "Source/Link": "url"
+        },
+        {...},
+        {...}]
+
+        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
+        """
+        user_prompt = f"""
+        Please find relevant datasets based on the following keywords: {keywords}.
         """
 
-        pass
+        LLM_response = self.llm_context.chat(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+            max_tokens=1500,
+            tools = ["dataset_search_tool"], #TODO: to be replaced with actual tool name later
+        )
+
+        # parse the response
+        response = LLM_response.choices[0].message.content
+        try:
+            datasets = json.loads(response)
+            if isinstance(datasets, dict):
+                datasets = [datasets]  # Ensure it's a list of models
+            elif isinstance(datasets, list):
+                pass
+            else:
+                raise ValueError("The response is not a valid list or dictionary.")
     
+        except json.JSONDecodeError:
+            match = re.search(r'\[.*\]', response, re.DOTALL)
+            if match:
+                datasets = json.loads(match.group())
+                if isinstance(datasets, dict):
+                    datasets = [datasets]  # Ensure it's a list of models
+                elif isinstance(datasets, list):
+                    pass
+            else:
+                raise ValueError("LLM output not valid JSON, here’s raw output:")
+            
+        return datasets
+        
+    def evaluation_code_generator(self, model_code, evaluation_suggestions, model_interface, output_path):
+        """
+        Generate evaluation code aligned with an existing simulation model.
+        """
+        # load conceptual model and model interface
+        evaluation_suggestions = json.dumps(evaluation_suggestions, indent=2)
+        model_interface = json.dumps(model_interface, indent=2)
+
+        system_prompt = """
+        You are an expert in computational social science and Python programming.
+        Generate evaluation code that aligns with an existing agent-based model.
+        You will be provided with the model code file, a model interface description, and evaluation suggestions.
+        Your task is to generate Python code that implements the evaluation suggestions using the provided model interface and the model code.
+        Do NOT modify model internals.
+        Only vary parameters, execute runs, and analyze outputs.
+        Do NOT provide any explanations or notes outside the code. Just provide the code.
+        """
+
+        user_prompt = f"""Model code file:{model_code}, Model interface:{model_interface}, Evaluation task:{evaluation_suggestions}
+        Generate Python code that implements this evaluation.
+        """
+
+        response = self.llm_context.chat(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+        )
+
+        code = response.choices[0].message.content
+        code = code.replace("```python\n", "").strip() # remove unnecessary markdown formatting if any
+        code = code.replace("```", "").strip()
+        with open(output_path, "w") as f: # export to a python file
+            f.write(code)
+
+        return code
+
+
+
     def run_pipeline(self, image_path, conceptual_model):
         """
         Run this pipeline to perform output analysis and model validation
@@ -312,4 +440,31 @@ class ModelValidation():
         print(f"Experimental design generated: {experiment}")
 
         #TODO: still need to add human in the loop for review
+    
+    def run_pipeline2(self, model_code, conceptual_model, model_interface, output_path):
+        """
+        Run this pipeline to perform model evaluation suggestion (VVUQ)
+        """
+        if not os.path.exists(conceptual_model):
+            raise ValueError("The provided conceptual model path does not exist.")
+        if not os.path.exists(model_interface):
+            raise ValueError("The provided model interface path does not exist.")
+        if not os.path.exists(model_code):
+            raise ValueError("The provided model code path does not exist.")
         
+        print("Starting evaluation suggestion generation...")
+        with open(conceptual_model, "r") as f:
+            conceptual_model_json = json.load(f)
+        with open(model_interface, "r") as f:
+            model_interface_json = json.load(f)
+        with open(model_code, "r") as f:
+            model_code_str = f.read()
+
+        suggestions = self.evaluation_suggestion(conceptual_model_json)
+        print(f"Evaluation suggestions generated: {json.dumps(suggestions, indent=2)}")
+        pick = int(input(print(f"Pick up a strategy for evaluation code generation(1/2/3)")))
+        suggestions_json = suggestions[pick - 1]
+        print(suggestions_json)
+        print("Starting evaluation code generation...")
+        self.evaluation_code_generator(model_code_str, suggestions_json, model_interface_json, output_path)
+        print(f"Code file saved and exported to {output_path}")
