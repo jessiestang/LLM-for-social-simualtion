@@ -392,10 +392,19 @@ class ModelValidation():
         You are an expert in computational social science and Python programming.
         Generate evaluation code that aligns with an existing agent-based model.
         You will be provided with the model code file, a model interface description, and evaluation suggestions.
-        Your task is to generate Python code that implements the evaluation suggestions using the provided model interface and the model code.
+        You have two tasks:
+        1. Generate Python code that implements the evaluation suggestions using the provided model interface and the model code.
         Do NOT modify model internals.
+        Do NOT modify existed classes or functions in the model code.
         Only vary parameters, execute runs, and analyze outputs.
         Do NOT provide any explanations or notes outside the code. Just provide the code.
+
+        2. Re-inspect the generated code to ensure it adheres to the model interface and evaluation suggestions.
+        Make sure that all required functions and classes from the model interface are properly utilized in the generated code.
+        Make sure that all relevant dependencies are imported.
+        Your final output should be ONLY the complete Python code file.
+        If you need to make any corrections, do so directly in the code.
+        Your output should be a complete Python code file that can be run independently.
         """
 
         user_prompt = f"""Model code file:{model_code}, Model interface:{model_interface}, Evaluation task:{evaluation_suggestions}
