@@ -27,7 +27,7 @@ class CodingAgent:
 
         # prompting the LLM
         system_prompt = """
-        You are a research assistant in computational social science who specializes in python programming with MESA framework.
+        You are an expert in computational social science who specializes in python programming with MESA framework.
         You will be given a json-format problem definition.
         Your job is to generate a python file that implements the model described in the problem definition.
         The file should be as complete as possible, with all necessary imports, class definitions, and functions.
@@ -137,6 +137,57 @@ class CodingAgent:
         revised_code = revised_code.replace("```", "").strip()
 
         return revised_code
+    
+
+    def model_interface_generation(self, code):
+        """
+        This function will extract a model interface from the generated code.
+        The interface will be used later for evaluation and validation.
+        """
+        # read python code
+        with open("generated_model.py", "r") as f:
+            code = f.read()
+        
+        # prompting the LLM
+        system_prompt = """
+        You are an expert in python programming and software design.
+        Your task is to extract a model interface from the provided python code.
+        This interface file should contain the following components:
+        1. model class name, implemented framework, and scheduler type.
+        2. agent class names,their key attributes (include name, type and range) and decision rules.
+        3. environment settings and key parameters (include name, type and range).
+        4. decision variables and formula.
+        5. output variables and their calculation methods.
+        6. data collection methods.
+        DO NOT invent any new names or parameters yourself. Stick strictly to the names and information from the provided code.
+        The output should be a json file with clear structure.
+        Do NOT provide any explanations or notes outside the code. Just provide the json interface.
+        """
+
+        user_prompt = f"""
+        Please extract a model interface from the following python code: {code}.
+        Make sure to follow the instructions in the system prompt.
+        """
+
+        # call the LLM
+        LLM_model = self.client.chat.completions.create(
+            model=self.model_name,
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.2,
+        )
+
+        # parse the responses
+        model_interface = LLM_model.choices[0].message.content
+        try:
+            interface = json.loads(model_interface)
+            return json.dumps(interface, indent=2)
+        except json.JSONDecodeError:
+            print("LLM output not valid JSON, here’s raw output:")
+            return model_interface
+
 
     def run_pipeline(self,json_path, user_requirements, output_path):
         """
@@ -166,6 +217,13 @@ class CodingAgent:
         with open(output_path, "w") as f: # export to a python file
             f.write(code)
         print("Code generation pipeline completed successfully.")
+
+        print("Step 5: Generating model interface...")
+        model_interface = self.model_interface_generation(code)
+        interface_output_path = output_path.replace(".py", "_interface.json")
+        with open(interface_output_path, "w") as f:
+            f.write(model_interface)
+        print("Model interface generated successfully.")
 
 
 
