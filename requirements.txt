@@ -1,0 +1,18 @@
+# Core dependencies for LLM-for-social-simulation
+# OpenAI API for LLM functionality
+openai
+
+# Document processing
+python-docx
+
+# Agent-based modeling
+mesa
+
+# Numerical computing
+numpy
+
+# Data visualization
+matplotlib
+
+# Network analysis
+networkx
