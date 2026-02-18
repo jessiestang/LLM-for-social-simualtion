@@ -1,16 +1,18 @@
 from openai import OpenAI
 from docx import Document
+import sys
 import json
 import os
 import re
 
 
 class ModelConstructor:
-    def __init__(self, model_name="gpt-4o-mini"):
+    def __init__(self, model_name="gpt-4o-mini", logger = None):
         self.client = OpenAI(
             api_key=os.getenv("OPENAI_API_KEY")
         )  # set your API key in environment variable
         self.model_name = model_name  # default model
+        self.logger = logger  # initialize the logger
     
     def _safe_json_load(self, text: str):
         """
@@ -172,6 +174,9 @@ class ModelConstructor:
         user_prompt = f"""
         The provided research context is {problem_definition}. Stick strictly to the requirement in the system prompt."""
         
+        # log the prompt
+
+
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=[
@@ -440,15 +445,18 @@ class ModelConstructor:
         print("Step 3: Summarizing the modelling ideas...")
         if new_model:
             summary = self.export_descriptive_model(file_path, mechanistic_model, new_model)
-            print(summary)
+            odd = self.ODD_formatter(file_path, mechanistic_model, new_model)
+            print(odd)
         else:
             summary = self.export_descriptive_model(file_path, mechanistic_model)
-            print(summary)
+            odd = self.ODD_formatter(file_path, mechanistic_model)
+            print(odd)
         
         print("Step 4: Export the model...")
         if summary:
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(summary, f, indent=2, ensure_ascii=False)
+    
          
 
     def save_to_wordfile(self, model_description: str, file_path: str):
@@ -504,5 +512,75 @@ class ModelConstructor:
         doc.save(file_path)
         print(f"Model description saved to {file_path}")
 
-    #TODO: export in ODD format
+    def ODD_formatter(self, problem_context:str, preliminary_model:str, secondary_model:str = None):
+        """
+        This function will format the model description into ODD format, which is a standard format for describing agent-based models.
+        """
+        with open(problem_context, "r", encoding="utf-8") as file:
+            problem_definition = file.read()
+        
+        system_prompt = """
+        You are a computational social scientist specializing in agent-based modeling (ABM).
+        Your task is to convert a detailed mechanistic model description into the ODD (Overview, Design concepts, Details) format, which is a standard for describing agent-based models.
+        
+        You will be provided with:
+        (1) A problem context file describing the research question, agent attributes, and environmental setup;
+        (2) A JSON file describing the agent decision context, behavioral rules, variables, thresholds, and model parameters.
+        
+        Your goals are to:
+        - Produce a complete and structured model specification in ODD format, ensuring that all necessary components for implementation are included;
+        - Ensure that no new information or assumptions are introduced beyond what appears in the provided files.
+
+        Your output should strictly follow the ODD format, which includes the following sections:
+        1. Purpose: a concise statement of the model's overall objective and research question.
+        2. Entities, state variables, and scales: a detailed description of the agents, their attributes, the environment, and the temporal and spatial scales of the model.
+        3. Process overview and scheduling: a step-by-step outline of the processes that occur in each time step, including the order of agent actions and interactions. When and how are state variables updated?
+        4. Design concepts: an explanation of the key design principles and mechanisms that drive the model, such as emergence, adaptation, learning, and interaction patterns.
+            a.Emergence: Which key model results or outputs are modeled as emerging from the adaptive decisions and behaviors of agents.
+            b.Adaptation: How do agents adapt their behavior based on their experiences or changes in the environment?
+            c.Learning: Do agents learn from their interactions or outcomes? If so, how is this learning process modeled?
+            d.Objectives: What are the goals or objectives that guide agent behavior? Are they maximizing utility, following heuristics, or something else?
+            e.Prediction: if an agent's adaptive traits or learning procedures are based on estimating future consequences of decisions, how do agents predict the future conditions (either environmental or internal) they will experience?
+            f.Sensing: What information do agents have access to when making decisions? Do they have perfect information about their environment, or do they rely on local perceptions or heuristics?
+            g.Interaction: How do agents interact with each other and with the environment? Are interactions local or global, and what is the nature of these interactions (e.g., competition, cooperation, communication)?
+            h.Stochasticity: What role does randomness play in the model? Are there stochastic elements in agent decision-making, interactions, or environmental changes?
+            i.Collectives: Do the individuals form or belong to aggregations that affect, and are affected by, the individuals?
+            j.Observation: What data or outputs are collected from the model, and how do they relate to the research question?
+        5. Initialization: a description of how the model is initialized (t = 0), including the initial conditions of agents and the environment.
+        6. Input data: a description of any external data that is used to drive the model (if there is), including how it is incorporated and its role in the model dynamics.
+        7. Submodels: a detailed description of the submodels that govern specific processes or behaviors in the model, including any mathematical equations or decision rules (if there is any).
+
+        An example of the expected output format can be:
+        "Specifically, we are addressing the following questions: [purpose]. The model includes the following entities [entities]. 
+        They are characterized by the following state variables [state variables]. 
+        The spatial and temporal resolution and extent are [temporal and spatial scales]. 
+        The most important design concepts of the model are [all relevant items inthe design concepts].
+        The model is initialized with [initialization]. 
+        Model dynamics are driven by input data representing [input data description]. (only if there is input data)
+        We also include the following submodels to capture key processes in the system: [submodel overview]. (only if there is submodel)
+        "
+        Export the model description in academic text format that follows the ODD template, ensuring that each section is clearly labeled and contains the relevant information extracted from the provided files.
+        """
+
+        if secondary_model:
+            user_prompt = f"""Here is the input problem context: {problem_definition},
+            and here are the JSON files describing the agents'behavior and decision-making {preliminary_model}, {secondary_model}.
+            Stick strictly to the instructions from the system prompt"""
+        else:
+            user_prompt = f"""Here is the input problem context: {problem_definition},
+            and here is the JSON file describing the agents'behavior and decision-making {preliminary_model}.
+            Stick strictly to the instructions from the system prompt"""
+        
+        # call the LLM model
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        pb = response.choices[0].message.content
+        features = self._safe_json_load(pb)
+        return features
+
 
