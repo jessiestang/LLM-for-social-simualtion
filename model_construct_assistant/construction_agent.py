@@ -71,18 +71,19 @@ class ModelConstructor:
         (5) Explain the behavioral or social reasoning behind each step.
 
         Step 1: Variable Identification
-        List two to three variables that influence the decision. For each variable, specify:
+        List about three variables that influence the decision, based on the provided model context and your internal knowledge. For each variable, specify:
         - Name and meaning,
         - Data type (e.g., Boolean, float, integer),
         - How it is updated over time (update rule and temporal scope: per time step, cumulative, or adaptive).
         - A reasonable default value based on theoretical considerations.
 
         Step 2: Mechanistic Integration
-        Formulate a mathematical equation that combines these variables into a single “decision signal” variable (e.g., perceived support, payoff, or utility).
+        Formulate a mathematical equation that combines these agent variables into a single “decision signal” variable (e.g., perceived support, payoff, or utility).
         - Use proper mathematical notation (e.g., \( O_i^t = β S_i^l + (1−β) S_i^m \)).
         - Define each symbol clearly.
         - If parameters exist (e.g., β, α, θ), describe their range and role.
         - If parameters exist, suggest reasonable default values based on theoretical considerations.
+        - Provide a short explanation of the behavioral or social mechanism that motivates this equation.
 
         When constructing or updating equations, consider not only additive (linear) relationships 
         but also multiplicative, interaction, and nonlinear effects where theoretically justified.
@@ -91,24 +92,16 @@ class ModelConstructor:
         - Nonlinear transformations (e.g., logistic, exponential, or squared terms) can represent thresholds or saturation effects.
         - Temporal feedback (e.g., variable depends on its own past value) can represent learning or adaptation.
 
-        Prefer interpretable complexity: always explain what social mechanism each nonlinearity represents.
-
         Step 3: Decision Rule Construction
         Translate the equation into one or more explicit if–then statements.
         Example:
-        IF perceived_majority > threshold THEN speak ELSE stay_silent.
+        IF [variable] > [threshold] THEN [do action A] ELSE [do action B].
 
         Step 4: Reasoning
         For each rule, explain briefly why this rule makes sense given the model context.
-
-        Step 5: Identify externl systems that interact with agents, if available.
-        You can SKIP this step if no external system is identified, also in the output.
-        Only execute step 5 if it is clearly mentioned in the input file that there is an external system.
-        For each system:
-        - Specify what input it receives from agents;
-        - Specify how it processes that input;
-        - Specify what output it returns to agents;
-        - Determine the timing of interaction (before or after agent updates)
+        
+        Step 5: Description temporal ordering
+        Provide the full simulation schedule in ordered steps.
 
         Output requirements:
         - Output *only valid JSON* (no markdown, no text before or after).
@@ -125,6 +118,7 @@ class ModelConstructor:
             "range": "expected numerical range or domain"
             }
         ],
+        
         "formula": {
             "expression": "mathematical formula (use LaTeX notation if needed)",
             "definitions": {
@@ -144,29 +138,11 @@ class ModelConstructor:
         "assumptions": [
             "state any simplifying assumptions or constraints"
         ],
-        "external_systems": [
-        {
-            "system_name": "name of the external system",
-            "inputs_from_agents": "what data or messages the system receives from agents",
-            "internal_variables": [
-            {
-                "name": "variable_name",
-                "meaning": "what it represents inside the system",
-                "update_rule": "how it updates over time (mathematical formula or aggregation rule)"
-            }
-            ],
-            "processing_logic": [
-            {
-                "rule": "explicit mathematical or algorithmic rule",
-                "description": "what this rule does and why it matters"
-            }
-            ],
-            "outputs_to_agents": [
-            {
-                "output_variable": "name of what is sent back to agents",
-                "generation_rule": "how it is computed from the system’s internal state",
-                "timing": "when it becomes available to agents (before/after their next decision)"
-            }
+
+        "temporal_ordering": 
+            [ "Step 1:...",
+            "Step 2:...",
+            "Step 3:..."
             ]
         }"""
 
@@ -191,24 +167,26 @@ class ModelConstructor:
     def human_in_the_loop(self, agent_rules: str, user_feedback: str):
         """
         Users can provide new ideas of potential variables they think will also be useful in explaining agents'decisions.
+        They can also provide feedback on the variables proposed by the LLM, such as modifying the definition, update rule, or default value of the variable.
         This LLM agent will try to see how it can also merge the proposed variable into existed design.
         """
         # load user input
         system_prompt = """
         You are a computational social scientist specializing in agent-based modeling (ABM).
-        Your task is to revise and extend an existing agent decision-making formulation,
-        based on new variables suggested by human researchers.
+        Your task is to revise and extend an existing agent decision-making formulation, based on new variables suggested by human researchers.
 
         You will be provided with:
         (1) A preliminary set of variables that affect agent behavior, along with their mathematical relationships.
-        (2) A list of additional variables proposed by human researchers.
+        (2) A list of additional variables proposed by human researchers, or modifications to the existing variables.
 
         Your goals are to:
-        1. Assign an appropriate data type, value range, and threshold logic to each newly proposed variable.
-        2. Analyze how these new variables might interact with the existing ones.
-        3. Integrate them into a new or revised mathematical formula that represents agent decision-making.
-        4. Translate the updated formula into explicit if–then decision rules.
-        5. Provide a short behavioral or social explanation for each rule.
+        1. Decide if the proposed changes are new variables or modifications to existing ones.
+        2.1 If they are new variables, assign an appropriate data type, value range, and threshold logic to it.
+        2.2 If they are modifications, update the variable definition accordingly.
+        3. Analyze how these new variables might interact with the existing ones.
+        4. Integrate them into a new or revised mathematical formula that represents agent decision-making.
+        5. Translate the updated formula into explicit if–then decision rules.
+        6. Provide a short behavioral or social explanation for each rule.
 
       
         Step 1: Variable Definition
@@ -428,89 +406,24 @@ class ModelConstructor:
         features = self._safe_json_load(pb)
         return features
 
-    def new_pipeline(self,file_path: str, save_path:str):
-        print("Step 1: Brainstorming model ideas based on problem definition...")
-        mechanistic_model = self.generate_decision_rule(file_path)
-        print(json.dumps(mechanistic_model, indent=2))
-
-        new_model = None
-        flag = input("Do you want to propose any new variable based on the current design? (y/n)")
-        while flag == "y":
-            user_input = input("Please provide name and a short definition of each new variable")
-            print("Step21: Generating new model ideas based on your input")
-            new_model = self.human_in_the_loop(json.dumps(mechanistic_model, indent=2), user_input)
-            print(json.dumps(new_model, indent=2))
-            flag = input("Do you want to propose any new variable based on the current design? (y/n)")
-        
-        print("Step 3: Summarizing the modelling ideas...")
-        if new_model:
-            summary = self.export_descriptive_model(file_path, mechanistic_model, new_model)
-            odd = self.ODD_formatter(file_path, mechanistic_model, new_model)
-            print(odd)
-        else:
-            summary = self.export_descriptive_model(file_path, mechanistic_model)
-            odd = self.ODD_formatter(file_path, mechanistic_model)
-            print(odd)
-        
-        print("Step 4: Export the model...")
-        if summary:
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(summary, f, indent=2, ensure_ascii=False)
-    
-         
-
-    def save_to_wordfile(self, model_description: str, file_path: str):
+    def save_odd_to_wordfile(self, text, file_path):
         """
-        This function saves the model description and export it as a word file
+        Save a raw ODD string to a Word file while preserving structure.
         """
         doc = Document()
-        doc.add_heading("Conceptual Model Description", level=1)
+        doc.add_heading("ODD Model Description", level=1)
 
-        # Handle both string and dict/list inputs
-        if isinstance(model_description, str):
-            sections = json.loads(model_description)
-        elif isinstance(model_description, (dict, list)):
-            sections = model_description
-        else:
-            raise ValueError(f"Unexpected type for model_description: {type(model_description)}")
-        
-            # Handle list of models
-        if isinstance(sections, list):
-            for i, model in enumerate(sections, 1):
-                doc.add_heading(f"Model {i}", level=1)
-                for section, content in model.items():
-                    doc.add_heading(section.replace("_", " ").title(), level=2)
-                    
-                    # Handle nested structures
-                    if isinstance(content, dict):
-                        for key, value in content.items():
-                            doc.add_paragraph(f"{key.replace('_', ' ').title()}: {value}")
-                    elif isinstance(content, list):
-                        for item in content:
-                            doc.add_paragraph(str(item), style='List Bullet')
-                    else:
-                        doc.add_paragraph(str(content))
-                
-                if i < len(sections):
-                    doc.add_page_break()
-        
-        # Handle single model (dict)
-        else:
-            for section, content in sections.items():
-                doc.add_heading(section.replace("_", " ").title(), level=2)
-                
-                # Handle nested structures
-                if isinstance(content, dict):
-                    for key, value in content.items():
-                        doc.add_paragraph(f"{key.replace('_', ' ').title()}: {value}")
-                elif isinstance(content, list):
-                    for item in content:
-                        doc.add_paragraph(str(item), style='List Bullet')
-                else:
-                    doc.add_paragraph(str(content))
+        # Split into lines
+        lines = text.split("\n")
 
+        for line in lines:
+            line = line.strip()
+
+            if not line:
+                doc.add_paragraph("")  # preserve empty line
+                continue
+            doc.add_paragraph(line)
         doc.save(file_path)
-        print(f"Model description saved to {file_path}")
 
     def ODD_formatter(self, problem_context:str, preliminary_model:str, secondary_model:str = None):
         """
@@ -580,7 +493,35 @@ class ModelConstructor:
             ],
         )
         pb = response.choices[0].message.content
-        features = self._safe_json_load(pb)
-        return features
+        return pb
 
+    def new_pipeline(self,file_path: str, save_path:str):
+            print("Step 1: Brainstorming model ideas based on problem definition...")
+            mechanistic_model = self.generate_decision_rule(file_path)
+            print(json.dumps(mechanistic_model, indent=2))
 
+            new_model = None
+            flag = input("Do you want to propose any new variable based on the current design, or modify the variables proposed by the LLM? (y/n)")
+            while flag == "y":
+                user_input = input("Please provide name and a short definition of each new variable")
+                print("Step2: Generating new model ideas based on your input")
+                new_model = self.human_in_the_loop(json.dumps(mechanistic_model, indent=2), user_input)
+                print(json.dumps(new_model, indent=2))
+                flag = input("Do you want to propose any new variable based on the current design, or modify the variables proposed by the LLM? (y/n)")
+            
+            print("Step 3: Summarizing the modelling ideas...")
+            if new_model:
+                summary = self.export_descriptive_model(file_path, mechanistic_model, new_model) # code version
+                odd = self.ODD_formatter(file_path, mechanistic_model, new_model) # ODD version
+                print(odd)
+            else:
+                summary = self.export_descriptive_model(file_path, mechanistic_model) # code version
+                odd = self.ODD_formatter(file_path, mechanistic_model) # ODD version
+                print(odd)
+            
+            print("Step 4: Export the model...")
+            if summary:
+                with open(save_path, "w", encoding="utf-8") as f:
+                    json.dump(summary, f, indent=2, ensure_ascii=False)  # save json version for code implementation
+                with open(save_path.replace(".json", ".docx"), "w", encoding="utf-8") as f:
+                    self.save_odd_to_wordfile(odd, save_path.replace(".json", ".docx"))  # save ODD version for documentation

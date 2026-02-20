@@ -2,24 +2,26 @@
 Simulating the spiral of silence phenomenon in online social environments.
 
 *Context Description:*
-People fear social isolation and tend to remain silent if they perceive their opinion as being in the minority. In online spaces, users form perceptions of public opinion both from their immediate social connections (neighbours) and from what they see in mass or social media.
+People fear social isolation and tend to remain silent if they perceive their opinion as being in the minority. 
+In online spaces, users form perceptions of public opinion both from their immediate social connections (neighbours) and from what they see in mass or social media.
 
 *Agent Characteristics:*
-There are two types of agents — human users and LLM-driven agents. Each holds an opinion (0 or 1). Human users decide whether to express or remain silent based on their perceived majority opinion. LLM agents always express their opinions and post more frequently. 
+There are two types of agents — human users and LLM-driven agents. 
+Human agents choose if they want to keep silent or speak at each timestep.
+A human agent can have an opinion of 0 or 1.
+LLM agents always speak at each timestep.
+A LLM agent can have an opinion of 0 or 1.
+For simplicity, the agent opinion will be fixed after initialization.
 
 *Environment and Interactions:*
 Agents are arranged in a two-dimensional grid, each interacting with eight neighbours. 
+Agents should be randomly distributed in the grid regarding to their types and the opinions they hold.
 
-*External System:*
-Media will act as an external system in this model
-This media does these jobs at each timestep:
-(1) It collects all message spoken up by the agents
-(2) It make all messages available to all agents, so agents can determine the global opinion landscape based on that.
-
-Three types of media will be tested:
-(1) No-intervention (publishes all messages),
-(2) Balanced (always shows 50–50 views),
-(3) Minority-boosted (slightly amplifies minority viewpoints).
+*system-level process*
+A media will operate at the global level. At each timeste:
+- Media collects opinions from agents that speak
+- Media publish all collected messages
+- Each agent will randomly sample 10 messages on the next timestep 
 
 *Behavioral Decisions*:
 Human agents need to determine whether they want to speak-up or not at the current simulation step.
