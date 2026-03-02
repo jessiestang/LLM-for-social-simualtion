@@ -164,6 +164,85 @@ class ModelConstructor:
         features = self._safe_json_load(pb)
         return features
 
+    def decision_rule_variables(self, problem_context:str):
+        """
+        This LLM agent takes the problem context as input and think about what variables might by important in driveing the agent's baheviour change."""
+        with open(problem_context, "r", encoding="utf-8") as file:
+            problem_definition = file.read()
+        
+        system_prompt = """
+        You are a computational social scientist specializing in agent-based modeling (ABM).
+        Given the problem context, think about what variables or factors might be important in driving the agent's behavior change, if you were the agent in the model.
+        Output a list of potential variables that could influence the agent's decision-making process, along with a brief explanation of why each variable might be relevant.
+        Output strictly as *valid JSON* with the following schema:
+        Do not give more than 5 variables.
+        Check if the variables you proposed are logically consistent with each other and with the problem context.
+        {
+            "potential_variables": [
+                {
+                    "name": "variable_name",
+                    "explanation": "brief explanation of why this variable is relevant, and how it will affect the decision-making process"
+                    "data_type": "data type (e.g., float, integer, boolean)",
+                    "update_rule": "how it changes over time",
+                }
+            ]
+        }
+        """
+        user_prompt = f"""The provided research context is {problem_definition}. Stick strictly to the requirement in the system prompt."""
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        pb = response.choices[0].message.content
+        variables = self._safe_json_load(pb)
+        return variables
+    
+    def decision_rule_designer(self, problem_context:str, variables:json):
+        """
+        This LLM agent will take a list of variables and the problem context as input.
+        It will think about how these variables interact together to drive the agent's decision-making process.
+        It will express the relationship in if-then rules"""
+        with open(problem_context, "r", encoding="utf-8") as file:
+            problem_definition = file.read()
+        
+        system_prompt = """
+        You are a computational social scientist specializing in agent-based modeling (ABM).
+        You will be provided with a problem context and a list of variables that are relevant to the agent's decision-making process.
+        Your task is to think about how these variables interact together to drive the agent's decision-making process, and express this relationship in if-then rules.
+        Select three variables from the provided list that you think are most important in influencing the agent's decision.
+        Use these variables then to compile if-then rules that capture the core decision logic of the agent.
+        Check if the rules are logically consistent with each other and with the problem context.
+        For each behavioural decision described in the problem context, write only one if-then rule that captures the core decision logic of the agent.
+        Output strictly as valid JSON with the following schema:
+        {   "selected_variables": ["list of the three selected variables that are most important in influencing the agent's decision"],
+            "decision_rules": [
+                {
+                    "rule": "IF condition THEN action",
+                    "explanation": "brief explanation of the reasoning behind this rule, and how it relates to the problem context"
+                    "mechanistic version": "a mathematical formula that captures the relationship between the variables in this rule (use LaTeX notation if needed)"
+                }
+            ]
+            }
+        """
+
+        user_prompt = f"""The provided research context is {problem_definition}, and here are the relevant variables: {json.dumps(variables, indent=2)}.
+        Stick strictly to the requirement in the system prompt."""
+        
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        pb = response.choices[0].message.content
+        decision_rules = self._safe_json_load(pb)
+        return decision_rules
+    
+
     def human_in_the_loop(self, agent_rules: str, user_feedback: str):
         """
         Users can provide new ideas of potential variables they think will also be useful in explaining agents'decisions.
@@ -257,7 +336,7 @@ class ModelConstructor:
         features = self._safe_json_load(pb)
         return features
     
-    def export_descriptive_model(self, problem_context:str, preliminary_model:str, secondary_model:str = None):
+    def mechanism_translation(self, problem_context:str, variables:json, decision_rules:json):
         """
         This LLM agent will regorganize and export a complete and descriptive mechanistic model
         based on the problem context, the preliminary decision-making part, and the secondar decision-making part,
@@ -273,22 +352,19 @@ class ModelConstructor:
 
         You will be provided with:
         (1) A problem context file describing the research question, agent attributes, and environmental setup;
-        (2) A JSON file describing the agent decision context, behavioral rules, variables, thresholds, and model parameters.
+        (2) A JSON file describing variables that drive agent behavior;
+        (3) A JSON file describing the if-then decision rules that govern agent behavior.
+
 
         Your goals are to:
-        - Produce a complete and structured model specification containing all necessary components for implementation;
-        - Include mathematical formulations of agent decision-making, using appropriate notation (LaTeX-style or inline);
-        - Provide a natural-language behavioral explanation corresponding to each equation or rule;
+        - Produce a complete and structured model specification that can be directly implemented in code, ensuring that all necessary components for implementation are included;
         - Ensure that no new information or assumptions are introduced beyond what appears in the provided files.
 
         Follow these steps carefully:
 
         1. Identify all agent types, their attributes, and actions implied by the rules.
         2. Define the environment (e.g., grid, network) and its parameters.
-        3. For each behavioral rule, provide both:
-        - the mathematical expression governing it,
-        - a verbal explanation in plain academic English,
-        - description of how variables in the mathematical expression are updated.
+        3. Describe the behavioural rule and the decision-making process in detail, including the if-then rules, and how variables are updated.
         4. Summarize model-level mechanisms such as feedback loops or external influences.
         5. List all simulation parameters, including agent population size, time steps, constants, and sensitivity parameters.
         6. Make sure that all variables and parameters have a reasonable default value and range (or domain).
@@ -349,24 +425,12 @@ class ModelConstructor:
             ],
   
         "decision_logic": {
-            "mathematical_expressions": [
-            {
-                "equation": "y_i(t) = β * x_i(t) + (1 - β) * m_i(t)",
-                "description": "brief explanation of what this equation means",
-                "variables":{
-                "variable_name_1": "descrpition of how the value of this variable can be obtained and updated",
-                "default_value_variable_name_1": "a reasonable default value",
-                "range_variable_name_1": "expected numerical range or domain",
-                "variable_name_2": "descrpition of how the value of this variable can be obtained and updated",
-                "default_value_variable_name_2": "a reasonable default value",
-                "range_variable_name_2": "expected numerical range or domain"
-                }
-            }
-            ],
             "if_then_rules": [
             {
                 "rule": "IF condition THEN action",
                 "explanation": "social or behavioral reasoning behind the rule"
+                "variables_involved": ["list of variables that are part of this rule"],
+                "update_effect": "how each variable is updated when this rule is triggered (e.g., increase, decrease, set to a specific value)"
             }
             ]
         },
@@ -385,14 +449,10 @@ class ModelConstructor:
         "description_of_the_model": "A concise, academic summary (4-5 sentences) describing how the model operates and what emergent phenomena it captures."
         }
         """
-        if secondary_model:
-            user_prompt = f"""Here is the input problem context: {problem_definition},
-            and here are the JSON files describing the agents'behavior and decision-making {preliminary_model}, {secondary_model}.
-            Stick strictly to the instructions from the system prompt"""
-        else:
-            user_prompt = f"""Here is the input problem context: {problem_definition},
-            and here is the JSON file describing the agents'behavior and decision-making {preliminary_model}.
-            Stick strictly to the instructions from the system prompt"""
+        user_prompt = f"""Here is the input problem context: {problem_definition},
+        here are the variables that drive agent behavior: {json.dumps(variables, indent=2)}, 
+        and here are the if-then decision rules that govern agent behavior: {json.dumps(decision_rules, indent=2)}.    
+        Stick strictly to the instructions from the system prompt"""
         
         # call the LLM model
         response = self.client.chat.completions.create(
@@ -403,9 +463,157 @@ class ModelConstructor:
             ],
         )
         pb = response.choices[0].message.content
-        features = self._safe_json_load(pb)
-        return features
+        mechanism = self._safe_json_load(pb)
+        return mechanism
 
+    def export_descriptive_model(self, problem_context:str, preliminary_model:str, secondary_model:str = None):
+            """
+            This LLM agent will regorganize and export a complete and descriptive mechanistic model
+            based on the problem context, the preliminary decision-making part, and the secondar decision-making part,
+            if available.
+            """
+            with open(problem_context, "r", encoding="utf-8") as file:
+                problem_definition = file.read()
+            
+            system_prompt="""
+            You are a computational social scientist specializing in agent-based modeling (ABM).
+            Your task is to transform short, partially specified model notes into a complete,
+            descriptive, and formal mechanistic model design suitable for implementation and analysis.
+
+            You will be provided with:
+            (1) A problem context file describing the research question, agent attributes, and environmental setup;
+            (2) A JSON file describing the agent decision context, behavioral rules, variables, thresholds, and model parameters.
+
+            Your goals are to:
+            - Produce a complete and structured model specification containing all necessary components for implementation;
+            - Include mathematical formulations of agent decision-making, using appropriate notation (LaTeX-style or inline);
+            - Provide a natural-language behavioral explanation corresponding to each equation or rule;
+            - Ensure that no new information or assumptions are introduced beyond what appears in the provided files.
+
+            Follow these steps carefully:
+
+            1. Identify all agent types, their attributes, and actions implied by the rules.
+            2. Define the environment (e.g., grid, network) and its parameters.
+            3. For each behavioral rule, provide both:
+            - the mathematical expression governing it,
+            - a verbal explanation in plain academic English,
+            - description of how variables in the mathematical expression are updated.
+            4. Summarize model-level mechanisms such as feedback loops or external influences.
+            5. List all simulation parameters, including agent population size, time steps, constants, and sensitivity parameters.
+            6. Make sure that all variables and parameters have a reasonable default value and range (or domain).
+            6. Provide a short academic-style description (4-5 sentences) summarizing the full model design.
+
+            Output strictly as *valid JSON* (no Markdown, no commentary).
+            Use the following schema exactly:
+
+            {
+            "model_title": "short descriptive title",
+            "overview": "brief purpose of the model",
+            "agents": {
+                "types": ["AgentType1", "AgentType2"],
+                "attributes": {
+                "AgentType1": ["attr1", "attr2"],
+                "AgentType2": ["attr1", "attr2"]
+                },
+                "actions": {
+                "AgentType1": ["action1", "action2"],
+                "AgentType2": ["action1", "action2"]
+                }
+            },
+            "environment": {
+                "structure": "description of environment (e.g., grid, network)",
+                "interaction_rules": "how agents interact with neighbours or the environment",
+                "parameters": {
+                "param1": "description of parameter 1",
+                "default_value_variable_name_1": "a reasonable default value",
+                "range_variable_name_1": "expected numerical range or domain",
+                "param2": "description of parameter 2",
+                "default_value_variable_name_2": "a reasonable default value",
+                "range_variable_name_2": "expected numerical range or domain",
+                }
+            },
+            "external_systems": [
+            {
+                "system_name": "name of the external system",
+                "inputs_from_agents": "what data or messages the system receives from agents",
+                "internal_variables": [
+                {
+                    "name": "variable_name",
+                    "meaning": "what it represents inside the system",
+                    "update_rule": "how it updates over time (mathematical formula or aggregation rule)"
+                }
+                ],
+                "processing_logic": [
+                {
+                    "rule": "explicit mathematical or algorithmic rule",
+                    "description": "what this rule does and why it matters"
+                }
+                ],
+                "outputs_to_agents": [
+                {
+                    "output_variable": "name of what is sent back to agents",
+                    "generation_rule": "how it is computed from the system’s internal state",
+                    "timing": "when it becomes available to agents (before/after their next decision)"
+                }
+                ],
+    
+            "decision_logic": {
+                "mathematical_expressions": [
+                {
+                    "equation": "y_i(t) = β * x_i(t) + (1 - β) * m_i(t)",
+                    "description": "brief explanation of what this equation means",
+                    "variables":{
+                    "variable_name_1": "descrpition of how the value of this variable can be obtained and updated",
+                    "default_value_variable_name_1": "a reasonable default value",
+                    "range_variable_name_1": "expected numerical range or domain",
+                    "variable_name_2": "descrpition of how the value of this variable can be obtained and updated",
+                    "default_value_variable_name_2": "a reasonable default value",
+                    "range_variable_name_2": "expected numerical range or domain"
+                    }
+                }
+                ],
+                "if_then_rules": [
+                {
+                    "rule": "IF condition THEN action",
+                    "explanation": "social or behavioral reasoning behind the rule"
+                }
+                ]
+            },
+            "simulation_parameters": {
+                "num_agents": "number of agents in the model",
+                "time_steps": "number of iterations to simulate",
+                "constants": {
+                "constant_name_1": "description of what this constant does",
+                "default_value_constant_name_1": "a reasonable default value of this constant",
+                "range_constant_name_1": "expected numerical range or domain of this constant",
+                "constant_name_2": "description of what this constant does",
+                "default_value_constant_name_2": "a reasonable default value of this constant",
+                "range_constant_name_2": "expected numerical range or domain of this constant"
+                }
+            },
+            "description_of_the_model": "A concise, academic summary (4-5 sentences) describing how the model operates and what emergent phenomena it captures."
+            }
+            """
+            if secondary_model:
+                user_prompt = f"""Here is the input problem context: {problem_definition},
+                and here are the JSON files describing the agents'behavior and decision-making {preliminary_model}, {secondary_model}.
+                Stick strictly to the instructions from the system prompt"""
+            else:
+                user_prompt = f"""Here is the input problem context: {problem_definition},
+                and here is the JSON file describing the agents'behavior and decision-making {preliminary_model}.
+                Stick strictly to the instructions from the system prompt"""
+            
+            # call the LLM model
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            pb = response.choices[0].message.content
+            features = self._safe_json_load(pb)
+            return features
     def save_odd_to_wordfile(self, text, file_path):
         """
         Save a raw ODD string to a Word file while preserving structure.
@@ -525,3 +733,27 @@ class ModelConstructor:
                     json.dump(summary, f, indent=2, ensure_ascii=False)  # save json version for code implementation
                 with open(save_path.replace(".json", ".docx"), "w", encoding="utf-8") as f:
                     self.save_odd_to_wordfile(odd, save_path.replace(".json", ".docx"))  # save ODD version for documentation
+    
+    def test_pipeline(self, file_path: str, save_path:str):
+        """Demonstrate how thw flow works linearly"""
+        print("Step 1: Generating variables")
+        variables = self.decision_rule_variables(file_path)
+        print(json.dumps(variables, indent=2))
+
+        print("Step 2: Generating decision rules")
+        decision_rules = self.decision_rule_designer(file_path, variables)
+        print(json.dumps(decision_rules, indent=2))
+
+        print("Step 3: Summarizing the mechanistic model")
+        mechanistic_model = self.mechanism_translation(file_path, variables, decision_rules)
+        print(json.dumps(mechanistic_model, indent=2))
+
+        print("Step 4: Export the model")
+        odd = self.ODD_formatter(file_path, mechanistic_model) # ODD version
+        print(odd)
+
+        if mechanistic_model:
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(mechanistic_model, f, indent=2, ensure_ascii=False)  # save json version for code implementation
+            with open(save_path.replace(".json", ".docx"), "w", encoding="utf-8") as f:
+                self.save_odd_to_wordfile(odd, save_path.replace(".json", ".docx"))  # save ODD version for documentation
