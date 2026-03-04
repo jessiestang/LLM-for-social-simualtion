@@ -200,7 +200,7 @@ class ModelConstructor:
         variables = self._safe_json_load(pb)
         return variables
     
-    def decision_rule_designer(self, problem_context:str, variables:json):
+    def decision_rule_designer(self, problem_context:str, variables:json, user_requirement:str):
         """
         This LLM agent will take a list of variables and the problem context as input.
         It will think about how these variables interact together to drive the agent's decision-making process.
@@ -212,23 +212,33 @@ class ModelConstructor:
         You are a computational social scientist specializing in agent-based modeling (ABM).
         You will be provided with a problem context and a list of variables that are relevant to the agent's decision-making process.
         Your task is to think about how these variables interact together to drive the agent's decision-making process, and express this relationship in if-then rules.
-        Select three variables from the provided list that you think are most important in influencing the agent's decision.
-        Use these variables then to compile if-then rules that capture the core decision logic of the agent.
-        Check if the rules are logically consistent with each other and with the problem context.
-        For each behavioural decision described in the problem context, write only one if-then rule that captures the core decision logic of the agent.
+        Follow these steps specifically:
+        (1) Select variables from the provided list based on the requirements of the user.
+        (2) Give each selected variable a proper datatype, a reasonable default value, and a clear update rule that describes how the variable changes over time (or remain fixed).
+        (3) Use these variables then to compile if-then rules that capture the core decision logic of the agent.
+        (4) Check if the rules are logically consistent with each other and with the problem context.
+            For each behavioural decision described in the problem context, write only one if-then rule that captures the core decision logic of the agent.
+
         Output strictly as valid JSON with the following schema:
-        {   "selected_variables": ["list of the three selected variables that are most important in influencing the agent's decision"],
+        {   "selected_variables": [
+            {
+                "name": "variable_name",
+                "data_type": "data type (e.g., float, integer, boolean)",
+                "default_value": "a reasonable default value based on theoretical considerations",
+                "update_rule": "how it changes over time (e.g., per time step, cumulative, or adaptive)"
+            }
+            ],
             "decision_rules": [
                 {
                     "rule": "IF condition THEN action",
                     "explanation": "brief explanation of the reasoning behind this rule, and how it relates to the problem context"
-                    "mechanistic version": "a mathematical formula that captures the relationship between the variables in this rule (use LaTeX notation if needed)"
                 }
             ]
             }
         """
 
         user_prompt = f"""The provided research context is {problem_definition}, and here are the relevant variables: {json.dumps(variables, indent=2)}.
+        Here is the user requirement regarding to selection of variables: {user_requirement}.
         Stick strictly to the requirement in the system prompt."""
         
         response = self.client.chat.completions.create(
@@ -633,7 +643,7 @@ class ModelConstructor:
             doc.add_paragraph(line)
         doc.save(file_path)
 
-    def ODD_formatter(self, problem_context:str, preliminary_model:str, secondary_model:str = None):
+    def ODD_formatter(self, problem_context:str, mechanistic_model:str):
         """
         This function will format the model description into ODD format, which is a standard format for describing agent-based models.
         """
@@ -683,14 +693,10 @@ class ModelConstructor:
         Export the model description in academic text format that follows the ODD template, ensuring that each section is clearly labeled and contains the relevant information extracted from the provided files.
         """
 
-        if secondary_model:
-            user_prompt = f"""Here is the input problem context: {problem_definition},
-            and here are the JSON files describing the agents'behavior and decision-making {preliminary_model}, {secondary_model}.
-            Stick strictly to the instructions from the system prompt"""
-        else:
-            user_prompt = f"""Here is the input problem context: {problem_definition},
-            and here is the JSON file describing the agents'behavior and decision-making {preliminary_model}.
-            Stick strictly to the instructions from the system prompt"""
+        
+        user_prompt = f"""Here is the input problem context: {problem_definition},
+        and here is the JSON file describing the agents'behavior and decision-making {mechanistic_model}.
+        Stick strictly to the instructions from the system prompt"""
         
         # call the LLM model
         response = self.client.chat.completions.create(
@@ -702,6 +708,14 @@ class ModelConstructor:
         )
         pb = response.choices[0].message.content
         return pb
+
+    def save_mechanistic_model(self, mechanistic_model:json, save_path:str):
+        """
+        Save the mechanistic model in json format for code implementation.
+        """
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(mechanistic_model, f, indent=2, ensure_ascii=False)
+        
 
     def new_pipeline(self,file_path: str, save_path:str):
             print("Step 1: Brainstorming model ideas based on problem definition...")

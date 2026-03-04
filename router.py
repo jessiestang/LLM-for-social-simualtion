@@ -5,6 +5,7 @@ from openai import OpenAI
 from model_construct_assistant.construction_agent import ModelConstructor
 from code_generator.coding_agent import CodingAgent
 from Validation_module.validator import ModelValidation
+from logger import SessionLogger
 
 
 TOOLS = [
@@ -42,7 +43,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "mechanism_translation",
-            "description": "Convert context + variables + rules into a mechanistic conceptual model.",
+            "description": "Convert problem context + variables + rules into a mechanistic conceptual model.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -87,16 +88,31 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "save_mechanistic_model",
+            "description": "Save the mechanistic model in json format for code implementation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mechanistic_model":{"type": "string"},
+                    "model_save_path":  {"type": "string"}
+                },
+                "required": ["mechanistic_model", "model_save_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_pipeline",
             "description": "Generate/debug MESA code from a conceptual model JSON.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "json_path":         {"type": "string"},
-                    "output_path":       {"type": "string"},
+                    "model_save_path":  {"type": "string"},
+                    "code_output_path":  {"type": "string"},
                     "user_requirements": {"type": "string"}
                 },
-                "required": ["json_path", "output_path"]
+                "required": ["model_save_path", "user_requirements", "code_output_path"]
             }
         }
     },
@@ -108,9 +124,9 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "conceptual_model": {"type": "string"}
+                    "model_save_path": {"type": "string"}
                 },
-                "required": ["conceptual_model"]
+                "required": ["model_save_path"]
             }
         }
     },
@@ -122,12 +138,11 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "model_code":            {"type": "string"},
                     "evaluation_suggestions":{"type": "string"},
-                    "output_path":           {"type": "string"},
-                    "model_interface":       {"type": "string"}
+                    "model_interface":       {"type": "string"},
+                    "evaluation_output_path":{"type": "string"},
                 },
-                "required": ["model_code", "evaluation_suggestions", "output_path"]
+                "required": [ "evaluation_suggestions", "model_interface", "evaluation_output_path"]
             }
         }
     },
@@ -172,20 +187,25 @@ ROUTER_SYSTEM_PROMPT = """
         - Produces: odd_docx_path (path)
         - Requires: odd_text, file_path
 
+        6) save_mechanistic_model(mechanistic_model, model_save_path)
+        - Purpose: save the mechanistic model in json format for code implementation.
+        - Produces: mechanistic_model_path (path)
+        - Requires: mechanistic_model, model_save_path
+
         B) Code generator
-        6) run_pipeline(json_path, user_requirements, output_path)
+        7) run_pipeline(json_path, user_requirements, output_path)
         - Purpose: generate/debug MESA code from conceptual model json.
         - Produces: model_code_path (path or directory)
         - Requires: conceptual_model_path (json_path), output_path
         - Optional: user_requirements
 
         C) Validation module
-        7) evaluation_suggestion(conceptual_model)
+        8) evaluation_suggestion(conceptual_model)
         - Purpose: suggest VVUQ evaluation strategies.
         - Produces: evaluation_suggestions (json)
         - Requires: conceptual_model (or decision_rules/mechanistic_model)
 
-        8) evaluation_code_generator(model_code, evaluation_suggestions, model_interface, output_path)
+        9) evaluation_code_generator(model_code, evaluation_suggestions, model_interface, output_path)
         - Purpose: generate evaluation code aligned with the model.
         - Produces: evaluation_code_path (path)
         - Requires: model_code, evaluation_suggestions, output_path
@@ -200,6 +220,7 @@ class RouterAgent:
         self.model_name = model_name
         self.workspace: Dict[str, Any] = {}
         self.history: List[Dict[str, Any]] = []
+        self.logger = SessionLogger()
 
         # ── Instantiate the sub-agents once ──
         self.model_constructor = ModelConstructor(model_name=model_name)
@@ -213,6 +234,7 @@ class RouterAgent:
             "mechanism_translation":     self.model_constructor.mechanism_translation,
             "ODD_formatter":             self.model_constructor.ODD_formatter,
             "save_odd_to_wordfile":      self.model_constructor.save_odd_to_wordfile,
+            "save_mechanistic_model":    self.model_constructor.save_mechanistic_model,
             "run_pipeline":              self.coding_agent.run_pipeline,
             "evaluation_suggestion":     self.model_validation.evaluation_suggestion,
             "evaluation_code_generator": self.model_validation.evaluation_code_generator,
@@ -225,6 +247,7 @@ class RouterAgent:
         if name not in registry:
             return f"Error: function '{name}' not found."
         try:
+            self.logger.log("tool_call", name, metadata={"args": args}) # log the tool call
             result = registry[name](**args)
             # Auto-save outputs to workspace by function name
             self.workspace[name + "_result"] = result
@@ -235,14 +258,17 @@ class RouterAgent:
                 "mechanism_translation":     "mechanistic_model",
                 "ODD_formatter":             "odd_text",
                 "save_odd_to_wordfile":      "odd_docx_path",
+                "save_mechanistic_model":    "mechanistic_model_path",
                 "run_pipeline":              "model_code_path",
                 "evaluation_suggestion":     "evaluation_suggestions",
                 "evaluation_code_generator": "evaluation_code_path",
             }
             if name in OUTPUT_KEY_MAP:
                 self.workspace[OUTPUT_KEY_MAP[name]] = result
+                self.logger.log("tool_result", result, metadata={"function": name}) # log the tool call output
             return json.dumps(result) if not isinstance(result, str) else result
         except Exception as e:
+            self.logger.log("tool_result", f"Error: {e}", metadata={"function": name}) # log the error
             return f"Error running {name}: {e}"
 
     def chat(self, user_message: str) -> str:
@@ -271,6 +297,7 @@ class RouterAgent:
             # No tool calls → final answer
             if not msg.tool_calls:
                 self.history.append({"role": "assistant", "content": msg.content})
+                self.logger.log("assistant", msg.content) # log the final assistant message
                 return msg.content
 
             # Append assistant message (with tool calls) to history

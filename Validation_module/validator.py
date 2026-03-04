@@ -316,7 +316,7 @@ class ModelValidation():
             return response
 
     
-    def evaluation_code_generator(self, model_code, evaluation_suggestions, model_interface, output_path):
+    def evaluation_code_generator(self, evaluation_suggestions, model_interface, output_path):
         """
         Generate evaluation code aligned with an existing simulation model.
         """
@@ -327,7 +327,7 @@ class ModelValidation():
         system_prompt = """
         You are an expert in computational social science and Python programming.
         Generate evaluation code that aligns with an existing agent-based model.
-        You will be provided with the model code file, a model interface description, and evaluation suggestions.
+        You will be provided with a model interface description, and evaluation suggestions.
         You have two tasks:
         1. Generate Python code that implements the evaluation suggestions using the provided model interface and the model code.
         Do NOT modify model internals.
@@ -343,7 +343,7 @@ class ModelValidation():
         Your output should be a complete Python code file that can be run independently.
         """
 
-        user_prompt = f"""Model code file:{model_code}, Model interface:{model_interface}, Evaluation task:{evaluation_suggestions}
+        user_prompt = f"""Model interface:{model_interface}, Evaluation task:{evaluation_suggestions}
         Generate Python code that implements this evaluation.
         """
 
@@ -411,5 +411,5 @@ class ModelValidation():
         suggestions_json = suggestions[pick - 1]
         print(suggestions_json)
         print("Starting evaluation code generation...")
-        self.evaluation_code_generator(model_code_str, suggestions_json, model_interface_json, output_path)
+        self.evaluation_code_generator(suggestions_json, model_interface_json, output_path)
         print(f"Code file saved and exported to {output_path}")
