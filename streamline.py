@@ -19,7 +19,7 @@ agent = st.session_state.agent
 ### ----------------
 # required to run the model construction assistant
 st.session_state.agent.workspace["problem_context"] = "E:\LLM_for_abm\LLM-for-social-simualtion\model_construct_assistant\spiral_silence.txt"
-st.session_state.agent.workspace["model_save_path"] = "E:\LLM_for_abm\LLM-for-social-simualtion\model_construct_assistant\_spiral_silence_model.json"
+st.session_state.agent.workspace["model_save_path"] = "E:\LLM_for_abm\LLM-for-social-simualtion\model_construct_assistant\_spiral_silence_model2.json"
 st.session_state.agent.workspace["file_path"] = "E:\LLM_for_abm\LLM-for-social-simualtion\model_construct_assistant\spiral_silence_output.docx"
 
 # required to run the code generator
@@ -56,6 +56,16 @@ for msg in agent.history:
         continue
     st.chat_message(role).write(content)
 
+# Trigger greeting once on first load
+
+greeting = st.session_state.agent.chat(
+    "Introduce yourself and explain what functions are available, "
+    "and tell the user what's already loaded in the workspace."
+)
+st.session_state.greeting = greeting
+
+if "greeting" in st.session_state:
+    st.chat_message("assistant").write(st.session_state.greeting)
 # ── Handle new input ──
 if user_input := st.chat_input("What would you like to do?"):
     agent.logger.log("user", user_input) # log the messages of the user

@@ -32,8 +32,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "problem_context":   {"type": "string"},
-                    "variables":         {"type": "string", "description": "JSON string of variables"},
-                    "user_requirement":  {"type": "string"}
+                    "variables":         {"type": "string", "description": "JSON string of variables"}
                 },
                 "required": ["problem_context", "variables"]
             }
@@ -170,7 +169,6 @@ ROUTER_SYSTEM_PROMPT = """
         - Purpose: generate executable if–then decision rules using selected variables.
         - Produces: decision_rules (json)
         - Requires: problem_context, variables
-        - Optional: user_requirement
 
         3) mechanism_translation(problem_context, variables, decision_rules)
         - Purpose: convert context + variables + rules into a mechanistic conceptual model.
@@ -322,7 +320,8 @@ if __name__ == "__main__":
 
     # Seed the workspace with your problem context upfront
 
-    print("ABM Assistant ready. Type your request.\n")
+    greeting = agent.chat("Introduce yourself and explain what functions are available.")
+    print(f"\nAssistant: {greeting}\n")
     while True:
         user_input = input("You: ").strip()
         if not user_input:

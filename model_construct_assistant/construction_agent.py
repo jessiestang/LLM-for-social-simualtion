@@ -200,7 +200,7 @@ class ModelConstructor:
         variables = self._safe_json_load(pb)
         return variables
     
-    def decision_rule_designer(self, problem_context:str, variables:json, user_requirement:str):
+    def decision_rule_designer(self, problem_context:str, variables:json):
         """
         This LLM agent will take a list of variables and the problem context as input.
         It will think about how these variables interact together to drive the agent's decision-making process.
@@ -210,35 +210,119 @@ class ModelConstructor:
         
         system_prompt = """
         You are a computational social scientist specializing in agent-based modeling (ABM).
-        You will be provided with a problem context and a list of variables that are relevant to the agent's decision-making process.
-        Your task is to think about how these variables interact together to drive the agent's decision-making process, and express this relationship in if-then rules.
-        Follow these steps specifically:
-        (1) Select variables from the provided list based on the requirements of the user.
-        (2) Give each selected variable a proper datatype, a reasonable default value, and a clear update rule that describes how the variable changes over time (or remain fixed).
-        (3) Use these variables then to compile if-then rules that capture the core decision logic of the agent.
-        (4) Check if the rules are logically consistent with each other and with the problem context.
-            For each behavioural decision described in the problem context, write only one if-then rule that captures the core decision logic of the agent.
+        You will be provided with a problem context and a list of variables relevant to the agent's decision-making process.
+        You will also receive user requirements regarding to which variables they wish to include in the decision rule design. Follow strictly the user requirements.
 
-        Output strictly as valid JSON with the following schema:
-        {   "selected_variables": [
+        Now let's do this task step-by-step:
+
+        (1) variable specification
+            - For each selected variable, assign a data type, a theory-grounded default value, and an update rule.
+
+        (2) interaction analysis
+            - Reason explicitly about how selected variables interact.
+            - Identify if any variables are so closely related that they are better represented as a single composite variable. If so, propose the merge and explain why.
+            - Ask yourself:
+                * Which variables always move together? → candidate for merging
+                * Which variables offset each other? → candidate for a ratio or difference variable
+                * Is there a higher-order concept that better captures the agent's mental state?
+
+        (3) rule derivation
+            - Each behavioral decision maps to EXACTLY ONE rule with a binary outcome.
+            Do not write the inverse as a separate rule — use IF...THEN...ELSE.
+            Bad: IF rule 1 THEN move;
+                AND IF rule 2 THEN stay; → move and stay are binary outcomes, so only one rule is needed here
+            Good: IF rule 1 THEN move;
+                ELSE stay → capture binary outcomes with if-else statement
+
+            - You MAY introduce NEW composite variables if merging produces a cleaner, more theoretically meaningful rule. For each composite variable:
+                * Give it a name that reflects its conceptual meaning
+                * Define how it is computed from its component variables
+                * Explain why this composite better captures the underlying behavior
+                * Express how this composite is constructed from its component in pseudocode
+            - NO formulas or numeric thresholds. Rules must be abstract and relational:
+            - Every variable or composite in the rule must be defined — either in selected_variables or composite_variables.
+
+        (4) consistency check
+             - Verify that rules do not contradict each other.
+             - Verify that every variable selected in step (1) appears in at least one rule.
+            - Verify that every behavioral decision in the problem context is covered by exactly one rule.
+        
+        Here is an example to illustrate the expected output quality:
+
+            Pedestrian Evacuation
+            Context: Agents decide whether to evacuate immediately or wait during a building fire.
+            
+            Selected variables: threat_proximity, exit_familiarity, crowd_density
+            
+            Composite variable introduced:
             {
-                "name": "variable_name",
-                "data_type": "data type (e.g., float, integer, boolean)",
-                "default_value": "a reasonable default value based on theoretical considerations",
-                "update_rule": "how it changes over time (e.g., per time step, cumulative, or adaptive)"
+                "name": "evacuation_urgency",
+                "composed_from": ["threat_proximity", "crowd_density"],
+                "conceptual_meaning": "the combined pressure an agent feels to act immediately, 
+                                    accounting for both physical danger and social congestion",
+                "composition_logic": "high threat_proximity amplified by high crowd_density 
+                                    produces urgency; if either is low, urgency is dampened",
+                "data_type": "float",
+                "pseudocode": "evacuation_urgency = weight1 * threat_proximity + weight2 * crowd_density, where weight1 is between 0 and 1 and weight2 = 1 - weight1",
+                "update_rule": "updated each timestep based on current threat_proximity 
+                                and observed crowd_density in neighbouring cells"
             }
+
+            Decision rule:
+            {
+                "behavioral_decision": "evacuate now or wait",
+                "outcome_variable": "agent.is_evacuating",
+                "rule_pseudocode": "IF evacuation_urgency is HIGH 
+                                        OR exit_familiarity is HIGH
+                                    THEN agent.is_evacuating = True
+                                    ELSE agent.is_evacuating = False",
+                "variables_used": ["evacuation_urgency", "exit_familiarity"],
+                "explanation": "An agent evacuates when the situation feels urgent OR when they 
+                                know where to go. Even low urgency can trigger evacuation if the 
+                                agent is confident about the exit route."
+            }
+ 
+        Output schema:
+        {
+            "selected_variables": [
+                {
+                    "name": "variable_name",
+                    "data_type": "...",
+                    "default_value": "...",
+                    "update_rule": "..."
+                }
+            ],
+            "composite_variables": [
+                {
+                    "name": "composite_variable_name",
+                    "composed_from": ["var1", "var2"],
+                    "conceptual_meaning": "what this composite represents behaviorally",
+                    "composition_logic": "how the components combine — qualitative description, no formula",
+                    "data_type": "...",
+                    "pseudocode": "...",
+                    "update_rule": "..."
+                }
+            ],
+            "interaction_analysis": [
+                {
+                    "behavioral_decision": "...",
+                    "reasoning": "...",
+                    "merge_decisions": "explain any merges made and why"
+                }
             ],
             "decision_rules": [
                 {
-                    "rule": "IF condition THEN action",
-                    "explanation": "brief explanation of the reasoning behind this rule, and how it relates to the problem context"
+                    "behavioral_decision": "...",
+                    "outcome_variable": "...",
+                    "rule_pseudocode": "IF (...) THEN outcome = True ELSE outcome = False",
+                    "variables_used": ["list of all variables and composites appearing in the rule"],
+                    "explanation": "..."
                 }
             ]
-            }
+        }
         """
 
         user_prompt = f"""The provided research context is {problem_definition}, and here are the relevant variables: {json.dumps(variables, indent=2)}.
-        Here is the user requirement regarding to selection of variables: {user_requirement}.
         Stick strictly to the requirement in the system prompt."""
         
         response = self.client.chat.completions.create(
@@ -624,6 +708,7 @@ class ModelConstructor:
             pb = response.choices[0].message.content
             features = self._safe_json_load(pb)
             return features
+    
     def save_odd_to_wordfile(self, text, file_path):
         """
         Save a raw ODD string to a Word file while preserving structure.
