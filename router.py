@@ -6,6 +6,7 @@ from model_construct_assistant.construction_agent import ModelConstructor
 from code_generator.coding_agent import CodingAgent
 from Validation_module.validator import ModelValidation
 from logger import SessionLogger
+import threading
 
 
 TOOLS = [
@@ -32,7 +33,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "problem_context":   {"type": "string"},
-                    "variables":         {"type": "string", "description": "JSON string of variables"}
+                    "variables":         {"type": "object"}
                 },
                 "required": ["problem_context", "variables"]
             }
@@ -47,8 +48,8 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "problem_context": {"type": "string"},
-                    "variables":       {"type": "string"},
-                    "decision_rules":  {"type": "string"}
+                    "variables":       {"type": "object"},
+                    "decision_rules":  {"type": "object"}
                 },
                 "required": ["problem_context", "variables", "decision_rules"]
             }
@@ -63,7 +64,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "problem_context":   {"type": "string"},
-                    "mechanistic_model": {"type": "string"}
+                    "mechanistic_model": {"type": "object"}
                 },
                 "required": ["problem_context", "mechanistic_model"]
             }
@@ -92,7 +93,7 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "mechanistic_model":{"type": "string"},
+                    "mechanistic_model":{"type": "object"},
                     "model_save_path":  {"type": "string"}
                 },
                 "required": ["mechanistic_model", "model_save_path"]
@@ -150,8 +151,12 @@ TOOLS = [
 ROUTER_SYSTEM_PROMPT = """
         You are a planning assistant for an LLM-assisted ABM framework.
 
-        You DO NOT generate models, code, or validation results.
-        You DO NOT execute anything.
+        STRICT RULES:
+        1. When a user asks to run or execute any function, you MUST call the corresponding tool.
+        Never answer from the workspace content directly — always invoke the tool.
+        
+        2. Only answer in prose (without calling a tool) when the user is asking a question 
+        about what to do next, or asking for clarification.
         Your jobs are:
         Present the user with a short menu of runnable functions and explain them briefly;
         When a user asks to do something, call the appropriate function(s) using the workspace values available.
@@ -162,52 +167,36 @@ ROUTER_SYSTEM_PROMPT = """
         A) Model construction assistant
         1) decision_rule_variables(problem_context)
         - Purpose: extract/brainstorm key decision variables from the problem context.
-        - Produces: variables (json)
-        - Requires: problem_context
 
-        2) decision_rule_designer(problem_context, variables, user_requirement)
+        2) decision_rule_designer(problem_context, variables)
         - Purpose: generate executable if–then decision rules using selected variables.
-        - Produces: decision_rules (json)
-        - Requires: problem_context, variables
 
         3) mechanism_translation(problem_context, variables, decision_rules)
         - Purpose: convert context + variables + rules into a mechanistic conceptual model.
-        - Produces: mechanistic_model (json or text)
-        - Requires: problem_context, variables, decision_rules
 
         4) ODD_formatter(problem_context, mechanistic_model)
         - Purpose: format a mechanistic model into ODD text.
-        - Produces: odd_text (string)
-        - Requires: problem_context, mechanistic_model
 
         5) save_odd_to_wordfile(text, file_path)
         - Purpose: save ODD text into a Word file.
-        - Produces: odd_docx_path (path)
-        - Requires: odd_text, file_path
 
         6) save_mechanistic_model(mechanistic_model, model_save_path)
         - Purpose: save the mechanistic model in json format for code implementation.
-        - Produces: mechanistic_model_path (path)
-        - Requires: mechanistic_model, model_save_path
 
         B) Code generator
         7) run_pipeline(json_path, user_requirements, output_path)
         - Purpose: generate/debug MESA code from conceptual model json.
-        - Produces: model_code_path (path or directory)
-        - Requires: conceptual_model_path (json_path), output_path
-        - Optional: user_requirements
 
         C) Validation module
         8) evaluation_suggestion(conceptual_model)
         - Purpose: suggest VVUQ evaluation strategies.
-        - Produces: evaluation_suggestions (json)
-        - Requires: conceptual_model (or decision_rules/mechanistic_model)
 
         9) evaluation_code_generator(model_code, evaluation_suggestions, model_interface, output_path)
         - Purpose: generate evaluation code aligned with the model.
-        - Produces: evaluation_code_path (path)
-        - Requires: model_code, evaluation_suggestions, output_path
-        - Optional: model_interface
+
+        IMPORTANT — After completing any function, always end your response with a "What's Next" section that tells the user what they can do next, 
+        based on what is now available in the workspace. 
+        Be specific — mention the function names and what inputs are now satisfied.
         """
 
 
@@ -219,11 +208,20 @@ class RouterAgent:
         self.workspace: Dict[str, Any] = {}
         self.history: List[Dict[str, Any]] = []
         self.logger = SessionLogger()
+        self._stop_event = threading.Event() 
 
         # ── Instantiate the sub-agents once ──
         self.model_constructor = ModelConstructor(model_name=model_name)
         self.coding_agent      = CodingAgent(model_name=model_name)
         self.model_validation  = ModelValidation(model_name=model_name)
+
+    def stop(self):
+        """Call this to interrupt any running chat loop."""
+        self._stop_event.set()
+
+    def reset_stop(self):
+        """Call this before starting a new chat turn."""
+        self._stop_event.clear()
 
     def _get_function_registry(self) -> Dict[str, Any]:
         return {
@@ -278,9 +276,16 @@ class RouterAgent:
         self.history.append({"role": "user", "content": user_message})
 
         messages = [{"role": "system", "content": system}] + self.history
+        max_tool_calls = 2  # hard limit per user turn
+        tool_call_count = 0
 
         # ── Agentic loop ──
         while True:
+            if self._stop_event.is_set(): # safety check to break the infinity loop
+                warning = "⚠️ Interrupted — agent loop was stopped."
+                self.history.append({"role": "assistant", "content": warning})
+                return warning
+            
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
@@ -297,12 +302,25 @@ class RouterAgent:
                 self.history.append({"role": "assistant", "content": msg.content})
                 self.logger.log("assistant", msg.content) # log the final assistant message
                 return msg.content
+            
+            # safety check to prevent the infinite loop
+            tool_call_count += len(msg.tool_calls)
+            if tool_call_count > max_tool_calls: 
+                warning = (
+                    "⚠️ Stopped after too many tool calls in one turn. "
+                    "This usually means a function failed silently. "
+                    "Check the function arguments and return values."
+                )
+                self.history.append({"role": "assistant", "content": warning})
+                return warning
 
             # Append assistant message (with tool calls) to history
             messages.append(msg)
 
             # Execute each tool call
             for tool_call in msg.tool_calls:
+                if self._stop_event.is_set():
+                    return "⚠️ Interrupted mid-tool-call."
                 name = tool_call.function.name
                 args = json.loads(tool_call.function.arguments)
 
@@ -322,6 +340,7 @@ if __name__ == "__main__":
 
     greeting = agent.chat("Introduce yourself and explain what functions are available.")
     print(f"\nAssistant: {greeting}\n")
+
     while True:
         user_input = input("You: ").strip()
         if not user_input:
