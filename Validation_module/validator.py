@@ -121,14 +121,13 @@ class ModelValidation():
                     raise ValueError(f"Cannot parse as JSON: {cleaned[:200]}")
         raise ValueError(f"Expected dict or JSON string, got {type(val).__name__}: {str(val)[:200]}")
     
-    def evaluation_suggestion(self, conceptual_model:object):
+    def evaluation_suggestion(self, model_save_path:str):
         """
         This function will give specific suggestions on how to evaluate the model,
         based on the conceptual model and the output analysis from LLM.
         """
-        conceptual_model = self._ensure_dict(conceptual_model)
-        conceptual_model = json.dumps(conceptual_model, indent=2)
-        # output_analysis = json.dumps(analysis, indent=2)
+        with open(model_save_path, "r", encoding="utf-8") as f:
+                conceptual_model = json.load(f)
 
         # prompt the LLM
         system_prompt = """
@@ -175,36 +174,26 @@ class ModelValidation():
         The expected effect is that [your predicion]. We measure [outcome variable] across [number] runs per condition.
         We and compare outputs in different conditions using [statsitical test].""
 
+        Your output should be strictly valid JSON in this exact format, with no trailing commas:
+        {
+            "evaluation_strategies":[
+                {
+                "name": "strategy_name",
+                "description": "description of strategy"
+                }
+            ]
+        }
 
-        Your output should be in this format:
-        [
-        {"strategy_id": "1",
-        "strategy_type": "Stochasticity Control",
-        "description": "detailed suggestions"},
-
-        {"strategy_id": "2",
-        "strategy_type": "Parameter Sensitivity Analysis",
-        "description": "detailed suggestions"},
-
-        {"strategy_id": "3",
-        "strategy_type": "Uncertainty Quantification",
-        "description": "detailed suggestions"},
-
-        {"strategy_id": "4",
-        "strategy_type": "Cross-condition Comparison",
-        "description": "detailed suggestions"},
-        
-        ]
-
-        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
-        Start your response directly with [ and end with ].
+        OUTPUT RULES:
+        - Return ONLY the JSON array. No markdown, no ```json fences, no commentary.
+        - No trailing commas after the last item in any array or object.
         """
 
         user_prompt = f"""
         Based on the conceptual model and output_analysis,
         please provide your evaluation suggestions following the instructions in the system prompt.
         """
-        self.llm_context.set_conceptual_model(json.loads(conceptual_model))
+        self.llm_context.set_conceptual_model(conceptual_model)
 
         LLM_response = self.llm_context.chat(
             messages=[
@@ -220,16 +209,14 @@ class ModelValidation():
         rules = self._safe_json_load(response)
         return rules
     
-    def evaluation_code_generator(self, evaluation_suggestions:object, model_interface:object, output_path:str):
+    def evaluation_code_generator(self, evaluation_suggestions:object, model_interface_path:str, evaluation_output_path:str):
         """
         Generate evaluation code aligned with an existing simulation model.
         """
         # load conceptual model and model interface
         evaluation_suggestions = self._ensure_dict(evaluation_suggestions)
-        model_interface = self._ensure_dict(model_interface)
-
-        evaluation_suggestions = json.dumps(evaluation_suggestions, indent=2)
-        model_interface = json.dumps(model_interface, indent=2)
+        with open(model_interface_path, "r", encoding="utf-8") as f:
+                model_interface = json.load(f)
 
         system_prompt = """
         You are an expert in computational social science and Python programming.
@@ -265,7 +252,7 @@ class ModelValidation():
         code = response.choices[0].message.content
         code = code.replace("```python\n", "").strip() # remove unnecessary markdown formatting if any
         code = code.replace("```", "").strip()
-        with open(output_path, "w") as f: # export to a python file
+        with open(evaluation_output_path, "w") as f: # export to a python file
             f.write(code)
 
-        return code
+        return f"Evaluation code generated and saved to {evaluation_output_path}"

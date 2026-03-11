@@ -34,7 +34,6 @@ if "agent" not in st.session_state:
 
     greeting = st.session_state.agent.chat(
     "Introduce yourself and explain what functions are available, "
-    "and tell the user what's already loaded in the workspace."
 )
     st.session_state.greeting = greeting  # activate the greeting message at initialization
 

@@ -43,15 +43,16 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "mechanism_translation",
-            "description": "Convert problem context + variables + rules into a mechanistic conceptual model.",
+            "description": "Convert problem context + variables + rules into a mechanistic conceptual model; also save the mechanistic model to the specified path.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "problem_context": {"type": "string"},
                     "variables":       {"type": "object"},
-                    "decision_rules":  {"type": "object"}
+                    "decision_rules":  {"type": "object"},
+                    "model_save_path": {"type": "string"}
                 },
-                "required": ["problem_context", "variables", "decision_rules"]
+                "required": ["problem_context", "variables", "decision_rules", "model_save_path"]
             }
         }
     },
@@ -82,21 +83,6 @@ TOOLS = [
                     "file_path": {"type": "string"}
                 },
                 "required": ["text", "file_path"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_mechanistic_model",
-            "description": "Save the mechanistic model in json format for code implementation.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "mechanistic_model":{"type": "object"},
-                    "model_save_path":  {"type": "string"}
-                },
-                "required": ["mechanistic_model", "model_save_path"]
             }
         }
     },
@@ -167,32 +153,47 @@ ROUTER_SYSTEM_PROMPT = """
         A) Model construction assistant
         1) decision_rule_variables(problem_context)
         - Purpose: extract/brainstorm key decision variables from the problem context.
+        - Produces: variables (json)
+        - Requires: problem_context (string)
 
         2) decision_rule_designer(problem_context, variables)
         - Purpose: generate executable if–then decision rules using selected variables.
+        - Produces: decision_rules (json)
+        - Requires: problem_context, variables
 
-        3) mechanism_translation(problem_context, variables, decision_rules)
+
+        3) mechanism_translation(problem_context, variables, decision_rules, model_save_path)
         - Purpose: convert context + variables + rules into a mechanistic conceptual model.
+        - Also save the mechanistic model to the specified path.
+        - Produces: mechanistic_model (json or text)
+        - Requires: problem_context, variables, decision_rules, model_save_path
 
         4) ODD_formatter(problem_context, mechanistic_model)
         - Purpose: format a mechanistic model into ODD text.
+        - Produces: odd_text (string)
+        - Requires: problem_context, mechanistic_model
 
         5) save_odd_to_wordfile(text, file_path)
         - Purpose: save ODD text into a Word file.
-
-        6) save_mechanistic_model(mechanistic_model, model_save_path)
-        - Purpose: save the mechanistic model in json format for code implementation.
+        - Produces: odd_docx_path (path)
+        - Requires: odd_text, file_path
 
         B) Code generator
-        7) run_pipeline(json_path, user_requirements, output_path)
+        6) run_pipeline(json_path, user_requirements, code_output_path)
         - Purpose: generate/debug MESA code from conceptual model json.
+        - Produces: model_code_path (path or directory)
+        - Requires: model_save_path (json_path), code_output_path, user_requirements (string)
 
         C) Validation module
-        8) evaluation_suggestion(conceptual_model)
+        7) evaluation_suggestion(model_save_path)
         - Purpose: suggest VVUQ evaluation strategies.
+        - Produces: evaluation_suggestions (string)
+        - Requires: model_save_path 
 
-        9) evaluation_code_generator(model_code, evaluation_suggestions, model_interface, output_path)
+        8) evaluation_code_generator(model_code, evaluation_suggestions, model_interface, evaluation_code_path)
         - Purpose: generate evaluation code aligned with the model.
+        - Produces: evaluation_code_path (path)
+        - Requires: evaluation_suggestions (string), model_interface (json), evaluation_code_path (path)
 
         IMPORTANT — After completing any function, always end your response with a "What's Next" section that tells the user what they can do next, 
         based on what is now available in the workspace. 
@@ -276,7 +277,7 @@ class RouterAgent:
         self.history.append({"role": "user", "content": user_message})
 
         messages = [{"role": "system", "content": system}] + self.history
-        max_tool_calls = 2  # hard limit per user turn
+        max_tool_calls = 5  # hard limit per user turn
         tool_call_count = 0
 
         # ── Agentic loop ──

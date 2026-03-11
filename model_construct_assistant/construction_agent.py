@@ -73,14 +73,9 @@ class ModelConstructor:
         You are a computational social scientist specializing in agent-based modeling (ABM).
         Given the problem context, think about what variables or factors might be important in driving the agent's behavior change, if you were the agent in the model.
         Output a list of potential variables that could influence the agent's decision-making process, along with a brief explanation of why each variable might be relevant.
-      
-        Before finalizing, ask yourself:
-        (1) What would a domain expert find SURPRISING about this variable list?
-        (2) Do the variables capture the key drivers of behavior change in this context, or are they just surface-level factors?
-        (3) f the variables you proposed are logically consistent with each other and with the problem context.
-        If nothing is surprising, you have only described the obvious — revise.
-
-        stick strictly to this output schema:
+        Output strictly as *valid JSON* with the following schema:
+        Do not give more than 5 variables.
+        Check if the variables you proposed are logically consistent with each other and with the problem context.
         {
             "potential_variables": [
                 {
@@ -145,6 +140,8 @@ class ModelConstructor:
         Use the computed signal(s) to make the binary decision.
         May have multiple elif branches if there are override conditions
 
+        - Part 1 must reference only variables defined in selected_variables or composite_variables.
+        - Part 2 must reference only signals computed in Part 1, or variables with clear ordinal meaning.
         - Named parameters (beta, threshold, etc.) must appear in the "parameters" field.
         - Each behavioral decision still maps to EXACTLY ONE rule block (Part 1 + Part 2 together).
 
@@ -152,10 +149,6 @@ class ModelConstructor:
              - Verify that rules do not contradict each other.
              - Verify that every variable selected in step (1) appears in at least one rule.
             - Verify that every behavioral decision in the problem context is covered by exactly one rule.
-        
-        Before finalizing, ask yourself:
-        If I ran this model for 100 steps, what non-obvious pattern would emerge?
-        If you cannot answer this, your rules are too trivial — revise.
         
         Here is an example to illustrate the expected output quality:
 
@@ -231,7 +224,7 @@ class ModelConstructor:
                                 cannot effectively use their spatial knowledge."
             }
  
-        Stay strictly to this output schema:
+        Output schema:
         {
             "selected_variables": [
                 {
@@ -301,7 +294,7 @@ class ModelConstructor:
         decision_rules = self._safe_json_load(pb)
         return decision_rules
     
-    def mechanism_translation(self, problem_context:str, variables:dict, decision_rules:dict):
+    def mechanism_translation(self, problem_context:str, variables:dict, decision_rules:dict, model_save_path:str):
         """
         This LLM agent will regorganize and export a complete and descriptive mechanistic model
         based on the problem context, the preliminary decision-making part, and the secondar decision-making part,
@@ -450,8 +443,12 @@ class ModelConstructor:
             ],
         )
         pb = response.choices[0].message.content
-        mechanism = self._safe_json_load(pb)
-        return mechanism
+        mechanistic_model = self._safe_json_load(pb)
+        # save the mchanistic model
+        with open(model_save_path, "w", encoding="utf-8") as f:
+            json.dump(mechanistic_model, f, indent=2, ensure_ascii=False)
+
+        return mechanistic_model, f"Model saved successfully at {model_save_path}"
 
     def save_odd_to_wordfile(self, text, file_path):
         """
