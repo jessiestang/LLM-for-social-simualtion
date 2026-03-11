@@ -188,8 +188,7 @@ class CodingAgent:
             print("LLM output not valid JSON, here’s raw output:")
             return model_interface
 
-
-    def run_pipeline(self,json_path, user_requirements, output_path):
+    def run_pipeline(self,json_path:str, user_requirements:str, output_path:str):
         """
         This function runs the entire code generation pipeline."""
         print("Step 1: Generating initial code based on the conceptual model...")

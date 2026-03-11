@@ -73,9 +73,14 @@ class ModelConstructor:
         You are a computational social scientist specializing in agent-based modeling (ABM).
         Given the problem context, think about what variables or factors might be important in driving the agent's behavior change, if you were the agent in the model.
         Output a list of potential variables that could influence the agent's decision-making process, along with a brief explanation of why each variable might be relevant.
-        Output strictly as *valid JSON* with the following schema:
-        Do not give more than 5 variables.
-        Check if the variables you proposed are logically consistent with each other and with the problem context.
+      
+        Before finalizing, ask yourself:
+        (1) What would a domain expert find SURPRISING about this variable list?
+        (2) Do the variables capture the key drivers of behavior change in this context, or are they just surface-level factors?
+        (3) f the variables you proposed are logically consistent with each other and with the problem context.
+        If nothing is surprising, you have only described the obvious — revise.
+
+        stick strictly to this output schema:
         {
             "potential_variables": [
                 {
@@ -140,8 +145,6 @@ class ModelConstructor:
         Use the computed signal(s) to make the binary decision.
         May have multiple elif branches if there are override conditions
 
-        - Part 1 must reference only variables defined in selected_variables or composite_variables.
-        - Part 2 must reference only signals computed in Part 1, or variables with clear ordinal meaning.
         - Named parameters (beta, threshold, etc.) must appear in the "parameters" field.
         - Each behavioral decision still maps to EXACTLY ONE rule block (Part 1 + Part 2 together).
 
@@ -149,6 +152,10 @@ class ModelConstructor:
              - Verify that rules do not contradict each other.
              - Verify that every variable selected in step (1) appears in at least one rule.
             - Verify that every behavioral decision in the problem context is covered by exactly one rule.
+        
+        Before finalizing, ask yourself:
+        If I ran this model for 100 steps, what non-obvious pattern would emerge?
+        If you cannot answer this, your rules are too trivial — revise.
         
         Here is an example to illustrate the expected output quality:
 
@@ -224,7 +231,7 @@ class ModelConstructor:
                                 cannot effectively use their spatial knowledge."
             }
  
-        Output schema:
+        Stay strictly to this output schema:
         {
             "selected_variables": [
                 {

@@ -1,4 +1,0 @@
-Measure the change of the ratio of silence in both opinion groups (opinion 0 and opinion 1, only for humans) throughout the simulation, display the measurement with a plot
-Measure the change of the opinion visibility gap (difference between proportions of the 2 opinion groups) in the sproken-out message over time, display the measurement with a plot
-Show a grid visualization of whether there is a persistent minority cluster, using colors to differentiate agents with different opinions
-So there should be three plots in total.
