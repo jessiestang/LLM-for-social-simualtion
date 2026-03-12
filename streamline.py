@@ -30,7 +30,7 @@ if "agent" not in st.session_state:
     ws["model_interface"]   = str(CODE_DIR / "code_test_interface.json")
 
     # Validator
-    ws["evaluation_code_output_path"] = str(VAL_DIR / "spiral_silence_evaluation_code.py")
+    ws["evaluation_output_path"] = str(VAL_DIR / "spiral_silence_evaluation_code.py")
 
     greeting = st.session_state.agent.chat(
     "Introduce yourself and explain what functions are available, "

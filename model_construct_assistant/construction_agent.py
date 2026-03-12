@@ -113,125 +113,35 @@ class ModelConstructor:
         You will be provided with a problem context and a list of variables relevant to the agent's decision-making process.
         You will also receive user requirements regarding to which variables they wish to include in the decision rule design. Follow strictly the user requirements.
 
-        Now let's do this task step-by-step:
+        Let's do this step-by-step:
+        Firstly, for each variable in the list:
+        (a) Describe in plain language how an INCREASE in this variable affects the agent's behavior.
+        (b) Describe how a DECREASE does the same
 
-        (1) variable specification
-            - For each selected variable, assign a data type, a theory-grounded default value, and an update rule.
+        Secondly, based on the first step, try to describe the relationship between variables:
+        (a) Which variables always move together? → candidate for merging into a composite
+        (b) Which variables oppose each other? → candidate for a ratio or difference 
+        (c) Which variable has a stonger influence on the agent's behavior? → candidate for a weighted variable
+        For each composite variable you propose, write pseudocode showing how it is constructed and explain WHY this composite is more meaningful than its components separately.
+        If you include a parameter, also explain why it is needed, and the range of this parameter.
 
-        (2) interaction analysis
-            - Reason explicitly about how selected variables interact.
-            - Identify if any variables are so closely related that they are better represented as a single composite variable. If so, propose the merge and explain why.
-            - Ask yourself:
-                * Which variables always move together? → candidate for merging
-                * Which variables offset each other? → candidate for a ratio or difference variable
-                * Is there a higher-order concept that better captures the agent's mental state?
+        Thirdly, based on the previous two steps, write up the decision-logic rule for each behaviour in the problem context. DO NOT write separate rules for binary outcomes of one behaviour.
+        Do this in the form of pseudocode, in if-else statement.
+        You need to use all the variables (including the composite one in the final rule)
+        If you include a parameter, also explain why it is needed, and the range of this parameter.
+        Describe in word how this rule corresponds to a real-life behaviour.
 
-        (3) rule derivation
-        
-        Rules must follow this two-part structure:
+        Constrain:
+        Do not include any hard-coded values in any rules; replace them with proper variable names
 
-        Part 1 — Signal composition:
-        Compute one or more intermediate signals by combining variables.
-        This makes explicit how variables are weighted and aggregated before a decision is made.
-        Use named parameters (e.g. beta, weight, threshold) instead of hardcoded numbers.
-        No real formulas — express combination qualitatively but in code-like syntax.
-
-        Part 2 - Decision logic:
-        Use the computed signal(s) to make the binary decision.
-        May have multiple elif branches if there are override conditions
-
-        - Part 1 must reference only variables defined in selected_variables or composite_variables.
-        - Part 2 must reference only signals computed in Part 1, or variables with clear ordinal meaning.
-        - Named parameters (beta, threshold, etc.) must appear in the "parameters" field.
-        - Each behavioral decision still maps to EXACTLY ONE rule block (Part 1 + Part 2 together).
-
-        (4) consistency check
-             - Verify that rules do not contradict each other.
-             - Verify that every variable selected in step (1) appears in at least one rule.
-            - Verify that every behavioral decision in the problem context is covered by exactly one rule.
-        
-        Here is an example to illustrate the expected output quality:
-
-            Pedestrian Evacuation
-            Context: Agents decide whether to evacuate immediately or wait during a building fire.
-
-            Selected variables: threat_proximity, exit_familiarity, crowd_density, panic_level
-
-            Composite variable introduced:
-            {
-                "name": "evacuation_urgency",
-                "composed_from": ["threat_proximity", "crowd_density"],
-                "conceptual_meaning": "the combined pressure an agent feels to act immediately,
-                                    accounting for both physical danger and social congestion",
-                "composition_logic": "high threat_proximity amplified by high crowd_density
-                                    produces urgency; if either is low, urgency is dampened",
-                "data_type": "float",
-                "update_rule": "updated each timestep based on current threat_proximity
-                                and observed crowd_density in neighbouring cells"
-            }
-
-            Decision rule:
-            {
-                "behavioral_decision": "evacuate now or wait",
-                "outcome_variable": "agent.is_evacuating",
-                "signal_computation": [
-                    {
-                        "signal_name": "evacuation_urgency",
-                        "composed_from": ["threat_proximity", "crowd_density"],
-                        "expression": "evacuation_urgency = alpha * threat_proximity + (1 - alpha) * crowd_density",
-                        "parameter": "alpha — controls relative weight of physical threat vs social congestion"
-                    },
-                    {
-                        "signal_name": "route_confidence",
-                        "composed_from": ["exit_familiarity", "panic_level"],
-                        "expression": "route_confidence = exit_familiarity * (1 - panic_level)",
-                        "parameter": "none — panic directly suppresses familiarity-based confidence"
-                    }
-                ],
-                "rule_pseudocode": 
-                    "IF evacuation_urgency > urgency_threshold:
-                        agent.is_evacuating = True
-                    ELIF route_confidence > confidence_override_threshold:
-                        agent.is_evacuating = True   # override: knows the exit well enough to act despite low urgency
-                    ELSE:
-                        agent.is_evacuating = False",
-                "parameters": [
-                    {
-                        "name": "alpha",
-                        "role": "balances physical threat vs crowd pressure in urgency signal",
-                        "default": "0.6",
-                        "calibratable": true
-                    },
-                    {
-                        "name": "urgency_threshold",
-                        "role": "minimum urgency level required to trigger evacuation",
-                        "default": "0.5",
-                        "calibratable": true
-                    },
-                    {
-                        "name": "confidence_override_threshold",
-                        "role": "route confidence level above which agent evacuates regardless of urgency",
-                        "default": "0.7",
-                        "calibratable": true
-                    }
-                ],
-                "variables_used": ["threat_proximity", "crowd_density", "exit_familiarity", "panic_level"],
-                "explanation": "The agent first computes how urgent the situation feels (evacuation_urgency)
-                                and how confidently they can navigate to the exit (route_confidence).
-                                Evacuation is triggered either when urgency crosses a threshold, OR when
-                                the agent knows the route well enough to act despite low perceived urgency.
-                                panic_level acts as a suppressor on route confidence — a panicking agent
-                                cannot effectively use their spatial knowledge."
-            }
- 
-        Output schema:
+        Output strictly as *valid JSON* with the following schema:
         {
-            "selected_variables": [
+            "variables": [
                 {
-                    "name": "variable_name",
-                    "data_type": "...",
-                    "default_value": "...",
-                    "update_rule": "..."
+                    "name": "change_variable_name",
+                    "change_direction": "increase or decrease",
+                    "affected_variable": "description of which variables are affected",
+                    "affected_behavior": "description of how agents'behavoir is affected"
                 }
             ],
             "composite_variables": [
@@ -247,39 +157,29 @@ class ModelConstructor:
             ],
             "interaction_analysis": [
                 {
-                    "behavioral_decision": "...",
-                    "reasoning": "...",
-                    "merge_decisions": "explain any merges made and why"
+                    "variables_move_together": "Description of variables that move in the same direction",
+                    "variables_oppose_each_other": "Description of variables that oppose each other",
+                    "variables_independent": "Description of variables that are independent"
                 }
             ],
             "decision_rules": [
                 {
                     "behavioral_decision": "...",
                     "outcome_variable": "...",
-                    "signal_computation": [
-                        {
-                            "signal_name": "name of the intermediate signal",
-                            "composed_from": ["var1", "var2"],
-                            "expression": "signal_name = param * var1 + (1 - param) * var2",
-                            "parameter": "param — what it controls (e.g. balances global vs local influence)"
-                        }
-                    ],
-                    "rule_pseudocode": "IF signal > threshold_param:\n    outcome = True\nELIF override_var > override_threshold:\n    outcome = True\nELSE:\n    outcome = False",
+                    "rule_pseudocode": "...",
                     "parameters": [
                         {
                             "name": "parameter_name",
                             "role": "what it controls in the decision",
                             "default": "theory-grounded default value",
-                            "calibratable": true
+                            "range": "expected range of the value"
                         }
                     ],
-                    "variables_used": ["list of all variables and signals appearing in the rule"],
-                    "explanation": "..."
+                    "explanation": "How the rule captures real-life behavior"
                 }
             ]
         }
         """
-
         user_prompt = f"""The provided research context is {problem_definition}, and here are the relevant variables: {json.dumps(variables, indent=2)}.
         Stick strictly to the requirement in the system prompt."""
         
@@ -341,12 +241,12 @@ class ModelConstructor:
                 "types": ["AgentType1", "AgentType2"],
                 "attributes": {
                     "AgentType1": [{
-                    "attr1": "definition and update rule", 
-                    "attr2": "definition and update rule"
+                    "attr1": "update rule, datatype and range", 
+                    "attr2": "definition and update rule, datatype and range"
                     }],
                     "AgentType2": [{
-                    "attr1": "definition and update rule", 
-                    "attr2": "definition and update rule"
+                    "attr1": "definition and update rule, datatype and range", 
+                    "attr2": "definition and update rule, datatype and range"
                     }]
                 },
                 "actions": {
@@ -450,32 +350,12 @@ class ModelConstructor:
 
         return mechanistic_model, f"Model saved successfully at {model_save_path}"
 
-    def save_odd_to_wordfile(self, text, file_path):
-        """
-        Save a raw ODD string to a Word file while preserving structure.
-        """
-        doc = Document()
-        doc.add_heading("ODD Model Description", level=1)
-
-        # Split into lines
-        lines = text.split("\n")
-
-        for line in lines:
-            line = line.strip()
-
-            if not line:
-                doc.add_paragraph("")  # preserve empty line
-                continue
-            doc.add_paragraph(line)
-        doc.save(file_path)
-
-        return f"ODD files save successfully to {file_path}"
-
-    def ODD_formatter(self, problem_context:str, mechanistic_model:dict):
+    def ODD_formatter(self, problem_context:str, model_save_path:str, file_path:str):
         """
         This function will format the model description into ODD format, which is a standard format for describing agent-based models.
         """
-        mechanistic_model = self._ensure_dict(mechanistic_model)
+        with open(model_save_path, "r", encoding="utf-8") as file:
+            mechanistic_model = json.load(file)
         with open(problem_context, "r", encoding="utf-8") as file:
             problem_definition = file.read()
         
@@ -535,22 +415,25 @@ class ModelConstructor:
                 {"role": "user", "content": user_prompt},
             ],
         )
-        pb = response.choices[0].message.content
-        return pb
+        text = response.choices[0].message.content
 
-    def save_mechanistic_model(self, mechanistic_model: dict, model_save_path: str):
-        try:
-            mechanistic_model = self._ensure_dict(mechanistic_model)
-        except ValueError as e:
-            return f"Error: could not parse mechanistic_model — {e}"
+        # save the ODD text to a Word file
+        doc = Document()
+        doc.add_heading("ODD Model Description", level=1)
 
-        if not isinstance(mechanistic_model, (dict, list)):
-            return f"Error: mechanistic_model is type {type(mechanistic_model).__name__}, expected dict."
+        # Split into lines
+        lines = text.split("\n")
 
-        Path(model_save_path).parent.mkdir(parents=True, exist_ok=True)
+        for line in lines:
+            line = line.strip()
 
-        with open(model_save_path, "w", encoding="utf-8") as f:
-            json.dump(mechanistic_model, f, indent=2, ensure_ascii=False)
+            if not line:
+                doc.add_paragraph("")  # preserve empty line
+                continue
+            doc.add_paragraph(line)
+        doc.save(file_path)
 
-        return f"Model saved successfully at {model_save_path}"
+        return text,f"ODD files save successfully to {file_path}"
+
+
         

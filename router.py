@@ -60,29 +60,15 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "ODD_formatter",
-            "description": "Format a mechanistic model into ODD protocol text.",
+            "description": "Format a mechanistic model into ODD protocol text. Save the ODD text to the specified file path.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "problem_context":   {"type": "string"},
-                    "mechanistic_model": {"type": "object"}
+                    "model_save_path":   {"type": "string"},
+                    "file_path":         {"type": "string"}
                 },
-                "required": ["problem_context", "mechanistic_model"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_odd_to_wordfile",
-            "description": "Save ODD text into a Word file.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text":      {"type": "string"},
-                    "file_path": {"type": "string"}
-                },
-                "required": ["text", "file_path"]
+                "required": ["problem_context", "model_save_path", "file_path"]
             }
         }
     },
@@ -98,7 +84,7 @@ TOOLS = [
                     "code_output_path":  {"type": "string"},
                     "user_requirements": {"type": "string"}
                 },
-                "required": ["model_save_path", "user_requirements", "code_output_path"]
+                "required": ["model_save_path", "code_output_path", "user_requirements"]
             }
         }
     },
@@ -124,7 +110,7 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "evaluation_suggestions":{"type": "string"},
+                    "evaluation_suggestions":{"type": "object"},
                     "model_interface":       {"type": "string"},
                     "evaluation_output_path":{"type": "string"},
                 },
@@ -161,39 +147,33 @@ ROUTER_SYSTEM_PROMPT = """
         - Produces: decision_rules (json)
         - Requires: problem_context, variables
 
-
         3) mechanism_translation(problem_context, variables, decision_rules, model_save_path)
         - Purpose: convert context + variables + rules into a mechanistic conceptual model.
         - Also save the mechanistic model to the specified path.
         - Produces: mechanistic_model (json or text)
         - Requires: problem_context, variables, decision_rules, model_save_path
 
-        4) ODD_formatter(problem_context, mechanistic_model)
+        4) ODD_formatter(problem_context, model_save_path, file_path)
         - Purpose: format a mechanistic model into ODD text.
         - Produces: odd_text (string)
-        - Requires: problem_context, mechanistic_model
-
-        5) save_odd_to_wordfile(text, file_path)
-        - Purpose: save ODD text into a Word file.
-        - Produces: odd_docx_path (path)
-        - Requires: odd_text, file_path
+        - Requires: problem_context, model_save_path, file_path
 
         B) Code generator
-        6) run_pipeline(json_path, user_requirements, code_output_path)
+        5) run_pipeline(model_save_path, code_output_path, user_requirements)
         - Purpose: generate/debug MESA code from conceptual model json.
         - Produces: model_code_path (path or directory)
-        - Requires: model_save_path (json_path), code_output_path, user_requirements (string)
+        - Requires: model_save_path (json_path), code_output_path (string), user_requirements (string)
 
         C) Validation module
-        7) evaluation_suggestion(model_save_path)
+        6) evaluation_suggestion(model_save_path)
         - Purpose: suggest VVUQ evaluation strategies.
         - Produces: evaluation_suggestions (string)
-        - Requires: model_save_path 
+        - Requires: model_save_path (string)
 
-        8) evaluation_code_generator(model_code, evaluation_suggestions, model_interface, evaluation_code_path)
+        7) evaluation_code_generator(evaluation_suggestions, model_interface, evaluation_output_path)
         - Purpose: generate evaluation code aligned with the model.
-        - Produces: evaluation_code_path (path)
-        - Requires: evaluation_suggestions (string), model_interface (json), evaluation_code_path (path)
+        - Produces: evaluation_output_path (path)
+        - Requires: evaluation_suggestions (string), model_interface (string), evaluation_output_path (string)
 
         IMPORTANT — After completing any function, always end your response with a "What's Next" section that tells the user what they can do next, 
         based on what is now available in the workspace. 
@@ -230,8 +210,6 @@ class RouterAgent:
             "decision_rule_designer":    self.model_constructor.decision_rule_designer,
             "mechanism_translation":     self.model_constructor.mechanism_translation,
             "ODD_formatter":             self.model_constructor.ODD_formatter,
-            "save_odd_to_wordfile":      self.model_constructor.save_odd_to_wordfile,
-            "save_mechanistic_model":    self.model_constructor.save_mechanistic_model,
             "run_pipeline":              self.coding_agent.run_pipeline,
             "evaluation_suggestion":     self.model_validation.evaluation_suggestion,
             "evaluation_code_generator": self.model_validation.evaluation_code_generator,
@@ -254,8 +232,6 @@ class RouterAgent:
                 "decision_rule_designer":    "decision_rules",
                 "mechanism_translation":     "mechanistic_model",
                 "ODD_formatter":             "odd_text",
-                "save_odd_to_wordfile":      "odd_docx_path",
-                "save_mechanistic_model":    "mechanistic_model_path",
                 "run_pipeline":              "model_code_path",
                 "evaluation_suggestion":     "evaluation_suggestions",
                 "evaluation_code_generator": "evaluation_code_path",

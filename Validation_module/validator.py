@@ -206,16 +206,16 @@ class ModelValidation():
 
         # parse the response
         response = LLM_response.choices[0].message.content
-        rules = self._safe_json_load(response)
-        return rules
+        evaluation_suggestions = self._safe_json_load(response)
+        return evaluation_suggestions
     
-    def evaluation_code_generator(self, evaluation_suggestions:object, model_interface_path:str, evaluation_output_path:str):
+    def evaluation_code_generator(self, evaluation_suggestions:object, model_interface:str, evaluation_output_path:str):
         """
         Generate evaluation code aligned with an existing simulation model.
         """
         # load conceptual model and model interface
         evaluation_suggestions = self._ensure_dict(evaluation_suggestions)
-        with open(model_interface_path, "r", encoding="utf-8") as f:
+        with open(model_interface, "r", encoding="utf-8") as f:
                 model_interface = json.load(f)
 
         system_prompt = """
