@@ -82,7 +82,12 @@ class ModelConstructor:
                     "name": "variable_name",
                     "explanation": "brief explanation of why this variable is relevant, and how it will affect the decision-making process"
                     "data_type": "data type (e.g., float, integer, boolean)",
-                    "update_rule": "how it changes over time",
+                    "extreme_values": {
+                        "min": "minimum value",
+                        "representation_of_min": "what this minimum value represents in the real world",
+                        "max": "maximum value",
+                        "representation_of_max": "what this maximum value represents in the real world"
+                    }
                 }
             ]
         }
@@ -113,35 +118,118 @@ class ModelConstructor:
         You will be provided with a problem context and a list of variables relevant to the agent's decision-making process.
         You will also receive user requirements regarding to which variables they wish to include in the decision rule design. Follow strictly the user requirements.
 
-        Let's do this step-by-step:
-        Firstly, for each variable in the list:
-        (a) Describe in plain language how an INCREASE in this variable affects the agent's behavior.
-        (b) Describe how a DECREASE does the same
+        Now let's do this task step-by-step:
+        (1) interaction analysis
+            - Reason explicitly about how selected variables interact.
+            - Identify if any variables are so closely related that they are better represented as a single composite variable. If so, propose the merge and explain why.
+            - Ask yourself:
+                * Which variables always move together? → candidate for merging
+                * Which variables offset each other? → candidate for a ratio or difference variable
+                * Is there a higher-order concept that better captures the agent's mental state?
 
-        Secondly, based on the first step, try to describe the relationship between variables:
-        (a) Which variables always move together? → candidate for merging into a composite
-        (b) Which variables oppose each other? → candidate for a ratio or difference 
-        (c) Which variable has a stonger influence on the agent's behavior? → candidate for a weighted variable
-        For each composite variable you propose, write pseudocode showing how it is constructed and explain WHY this composite is more meaningful than its components separately.
-        If you include a parameter, also explain why it is needed, and the range of this parameter.
+        (2) rule derivation
+        
+        Rules must follow this two-part structure:
 
-        Thirdly, based on the previous two steps, write up the decision-logic rule for each behaviour in the problem context. DO NOT write separate rules for binary outcomes of one behaviour.
-        Do this in the form of pseudocode, in if-else statement.
-        You need to use all the variables (including the composite one in the final rule)
-        If you include a parameter, also explain why it is needed, and the range of this parameter.
-        Describe in word how this rule corresponds to a real-life behaviour.
+        Part 1 — Signal composition:
+        Compute one or more intermediate signals by combining variables.
+        This makes explicit how variables are weighted and aggregated before a decision is made.
+        Use named parameters (e.g. beta, weight, threshold) instead of hardcoded numbers.
+        No real formulas — express combination qualitatively but in code-like syntax.
 
-        Constrain:
-        Do not include any hard-coded values in any rules; replace them with proper variable names
+        Part 2 - Decision logic:
+        Use the computed signal(s) to make the binary decision.
+        May have multiple elif branches if there are override conditions
 
-        Output strictly as *valid JSON* with the following schema:
+        - Part 1 must reference only variables defined in selected_variables or composite_variables.
+        - Part 2 must reference only signals computed in Part 1, or variables with clear ordinal meaning.
+        - Named parameters (beta, threshold, etc.) must appear in the "parameters" field.
+        - Each behavioral decision still maps to EXACTLY ONE rule block (Part 1 + Part 2 together).
+
+        (3) consistency check
+             - Verify that rules do not contradict each other.
+             - Verify that every variable selected in step (1) appears in at least one rule.
+            - Verify that every behavioral decision in the problem context is covered by exactly one rule.
+        
+        Here is an example to illustrate the expected output quality:
+
+            Pedestrian Evacuation
+            Context: Agents decide whether to evacuate immediately or wait during a building fire.
+
+            Selected variables: threat_proximity, exit_familiarity, crowd_density, panic_level
+
+            Composite variable introduced:
+            {
+                "name": "evacuation_urgency",
+                "composed_from": ["threat_proximity", "crowd_density"],
+                "conceptual_meaning": "the combined pressure an agent feels to act immediately,
+                                    accounting for both physical danger and social congestion",
+                "composition_logic": "high threat_proximity amplified by high crowd_density
+                                    produces urgency; if either is low, urgency is dampened",
+                "data_type": "float",
+                "update_rule": "updated each timestep based on current threat_proximity
+                                and observed crowd_density in neighbouring cells"
+            }
+
+            Decision rule:
+            {
+                "behavioral_decision": "evacuate now or wait",
+                "outcome_variable": "agent.is_evacuating",
+                "signal_computation": [
+                    {
+                        "signal_name": "evacuation_urgency",
+                        "composed_from": ["threat_proximity", "crowd_density"],
+                        "expression": "evacuation_urgency = alpha * threat_proximity + (1 - alpha) * crowd_density",
+                        "parameter": "alpha — controls relative weight of physical threat vs social congestion"
+                    },
+                    {
+                        "signal_name": "route_confidence",
+                        "composed_from": ["exit_familiarity", "panic_level"],
+                        "expression": "route_confidence = exit_familiarity * (1 - panic_level)",
+                        "parameter": "none — panic directly suppresses familiarity-based confidence"
+                    }
+                ],
+                "rule_pseudocode": 
+                    "IF evacuation_urgency > urgency_threshold:
+                        agent.is_evacuating = True
+                    ELIF route_confidence > confidence_override_threshold:
+                        agent.is_evacuating = True   # override: knows the exit well enough to act despite low urgency
+                    ELSE:
+                        agent.is_evacuating = False",
+                "parameters": [
+                    {
+                        "name": "alpha",
+                        "role": "balances physical threat vs crowd pressure in urgency signal",
+                        "default": "0.6",
+                        "calibratable": true
+                    },
+                    {
+                        "name": "urgency_threshold",
+                        "role": "minimum urgency level required to trigger evacuation",
+                        "default": "0.5",
+                        "calibratable": true
+                    },
+                    {
+                        "name": "confidence_override_threshold",
+                        "role": "route confidence level above which agent evacuates regardless of urgency",
+                        "default": "0.7",
+                        "calibratable": true
+                    }
+                ],
+                "variables_used": ["threat_proximity", "crowd_density", "exit_familiarity", "panic_level"],
+                "explanation": "The agent first computes how urgent the situation feels (evacuation_urgency)
+                                and how confidently they can navigate to the exit (route_confidence).
+                                Evacuation is triggered either when urgency crosses a threshold, OR when
+                                the agent knows the route well enough to act despite low perceived urgency.
+                                panic_level acts as a suppressor on route confidence — a panicking agent
+                                cannot effectively use their spatial knowledge."
+            }
+ 
+        Output schema:
         {
-            "variables": [
+            "selected_variables": [
                 {
-                    "name": "change_variable_name",
-                    "change_direction": "increase or decrease",
-                    "affected_variable": "description of which variables are affected",
-                    "affected_behavior": "description of how agents'behavoir is affected"
+                    "name": "variable_name"
                 }
             ],
             "composite_variables": [
@@ -157,25 +245,34 @@ class ModelConstructor:
             ],
             "interaction_analysis": [
                 {
-                    "variables_move_together": "Description of variables that move in the same direction",
-                    "variables_oppose_each_other": "Description of variables that oppose each other",
-                    "variables_independent": "Description of variables that are independent"
+                    "behavioral_decision": "...",
+                    "reasoning": "...",
+                    "merge_decisions": "explain any merges made and why"
                 }
             ],
             "decision_rules": [
                 {
                     "behavioral_decision": "...",
                     "outcome_variable": "...",
-                    "rule_pseudocode": "...",
+                    "signal_computation": [
+                        {
+                            "signal_name": "name of the intermediate signal",
+                            "composed_from": ["var1", "var2"],
+                            "expression": "how the signal is computed from its components, in code-like pseudocode",
+                            "parameter": "param — what it controls (e.g. balances global vs local influence)"
+                        }
+                    ],
+                    "rule_pseudocode": "expression of the decision rule in pseudocode, using variable names, signals, parameters, and thresholds as needed",
                     "parameters": [
                         {
                             "name": "parameter_name",
                             "role": "what it controls in the decision",
                             "default": "theory-grounded default value",
-                            "range": "expected range of the value"
+                            "calibratable": true
                         }
                     ],
-                    "explanation": "How the rule captures real-life behavior"
+                    "variables_used": ["list of all variables and signals appearing in the rule"],
+                    "explanation": "..."
                 }
             ]
         }
@@ -434,6 +531,187 @@ class ModelConstructor:
         doc.save(file_path)
 
         return text,f"ODD files save successfully to {file_path}"
+    
+
+    """
+    You are a computational social scientist specializing in agent-based modeling (ABM).
+        You will be provided with a problem context and a list of variables relevant to the agent's decision-making process.
+        You will also receive user requirements regarding to which variables they wish to include in the decision rule design. Follow strictly the user requirements.
+
+        Let's do this step-by-step:
+        Firstly, for each variable in the list:
+        (a) Describe in plain language how an INCREASE in this variable affects the agent's behavior.
+        (b) Describe how a DECREASE does the same
+
+        Secondly, based on the first step, try to describe the relationship between variables:
+        (a) Which variables always move together? → candidate for merging into a composite
+        (b) Which variables oppose each other? → candidate for a ratio or difference 
+        (c) Which variable has a stonger influence on the agent's behavior? → candidate for a weighted variable
+        For each composite variable you propose, write pseudocode showing how it is constructed and explain WHY this composite is more meaningful than its components separately.
+        If you include a parameter, also explain why it is needed, and the range of this parameter.
+
+        Thirdly, based on the previous two steps, write up the decision-logic rule for each behaviour in the problem context. DO NOT write separate rules for binary outcomes of one behaviour.
+        Do this in the form of pseudocode, in if-else statement.
+        You need to use all the variables (including the composite one in the final rule)
+        If you include a parameter, also explain why it is needed, and the range of this parameter.
+        Describe in word how this rule corresponds to a real-life behaviour.
+
+        Constrain:
+        Do not include any hard-coded values in any rules; replace them with proper variable names
+
+        Output strictly as *valid JSON* with the following schema:
+        {
+            "variables": [
+                {
+                    "name": "change_variable_name",
+                    "change_direction": "increase or decrease",
+                    "affected_variable": "description of which variables are affected",
+                    "affected_behavior": "description of how agents'behavoir is affected"
+                }
+            ],
+            "composite_variables": [
+                {
+                    "name": "composite_variable_name",
+                    "composed_from": ["var1", "var2"],
+                    "conceptual_meaning": "what this composite represents behaviorally",
+                    "composition_logic": "how the components combine — qualitative description, no formula",
+                    "data_type": "...",
+                    "pseudocode": "...",
+                    "update_rule": "..."
+                }
+            ],
+            "interaction_analysis": [
+                {
+                    "variables_move_together": "Description of variables that move in the same direction",
+                    "variables_oppose_each_other": "Description of variables that oppose each other",
+                    "variables_independent": "Description of variables that are independent"
+                }
+            ],
+            "decision_rules": [
+                {
+                    "behavioral_decision": "...",
+                    "outcome_variable": "...",
+                    "rule_pseudocode": "...",
+                    "parameters": [
+                        {
+                            "name": "parameter_name",
+                            "role": "what it controls in the decision",
+                            "default": "theory-grounded default value",
+                            "range": "expected range of the value"
+                        }
+                    ],
+                    "explanation": "How the rule captures real-life behavior"
+                }
+            ]
+        }
+    """
+
+    """
+    You are a computational social scientist specializing in agent-based modeling (ABM).
+        You will be provided with a problem context and a list of variables relevant to the agent's decision-making process.
+        You will also receive user requirements regarding to which variables users wish to include in the decision rule design. Follow strictly the user requirements.
+
+        Let's do this step-by-step:
+        Imagine you are the agent in the model, and you are making a behavourial decision based on the provided variables.
+        Firstly, for each variable in the list:
+        - Describe in plain language how change in values (in both directions) of this variables may have an influence on your behavouir.
+        E.g., "An increase in variable X makes me more likely to do Y because... A decrease in variable X makes me less likely to do Y because..."'
+        - Describe which variables have the most influence on your behavior, and which variables have a weaker influence. In other words, what weight you would give them.
+        E.g., "Variable X has the strongest influence on my behavior, because..., so I would give it a weight of [number between 0 and 1]. Variable Y has a weaker influence on my behavior, because..., so I would give it a weight of [number between 0 and 1]..." 
+        - Now try to summarize your answers to the above questions into a if-else style decision rule. Make sure you use all the variables, including the weight and threhold variables.
+        - Output your decision rule in the form of pseudocode, for example:
+        IF variable1 * weight1 + variable2 * weight2 > threshold:
+        THEN do Action A
+        ELSE do Action B
+        - Describe in words how this decision rule captures the real-life behavior.
+
+        Constrain:
+        A decision signal must use AT MOST 2 variables or composites.
+        - If you have more than 2 variables, you MUST first merge related variables 
+        into a composite in Step 2 before writing the rule.
+        - A rule that sums all variables with weights is NOT acceptable — 
+        it means you skipped the composite variable step.
+
+        BAD (not acceptable):
+        signal = var1 * w1 + var2 * w2 + var3 * w3 + var4 * w4
+        IF signal > threshold: speak
+        GOOD (acceptable):
+        social_pressure = var1 * w1 + (1 - w1) * var2   # composite of related variables
+        IF social_pressure > threshold AND var3 > var3_threshold:
+            speak
+        ELIF var4 > var4_threshold:
+            speak                                      
+        ELSE:
+            silent
+
+        Output strictly as valid JSON with the following schema:
+        {
+            "variable_analysis": [
+                {
+                    "variable_name": "name of the variable",
+                    "influence_analysis": "your plain language analysis of how value changes in both directions affect behavior and other variables",
+                    "weight_reasoning": "your reasoning about the weight of this variable relative to others, including the assigned weight",
+                    "threshold_reasoning": "your reasoning about whether a threshold exists, and if so, what it is and why"
+                }
+            ],
+            "decision_rules": [
+                {
+                    "behavioral_decision": "name of the behavior being decided",
+                    "reasoning": "your plain language summary of how the variables combine to drive this decision",
+                    "rule_pseudocode": "express the decision rule in pseudocode, using variable names, weights, and thresholds as needed",
+                    "real_life_interpretation": "one sentence describing how this rule captures real-life behavior"
+                }
+            ]
+        }"""
+    
+
+    
+    """Imagine you are an agent in the model, and you are making a behavourial decision based on the provided variables.
+        Firstly, think about 3-4 scenarios where the variables have different values.
+        The variables need to cover a wide range of possible combinations of variable values, including edge cases (e.g., all variables are high, all variables are low, some variables are high while others are low, etc.).
+        Describe these scenarios in plain language, and what actions you would take in each scenario.
+        Describe some general rules or patterns you see in how the variables influence your behavior across these scenarios.
+        Summarize these rules in the form of if-else style decision rules. Make sure you use all the variables, and do not include any hard-coded values in any rules; replace them with proper variable names.
+        Output strictly as *valid JSON* with the following schema:
+        {
+            "scenarios": [
+                {
+                    "scenario_id": "1",
+                    "description": "plain language description of the situation",
+                    "variable_values": {
+                        "variable_name_1": "high / low / moderate — with brief justification",
+                        "variable_name_2": "high / low / moderate — with brief justification"
+                    },
+                    "action_taken": "the action the agent takes in this scenario",
+                    "reasoning": "one sentence explaining why this action maximizes payoff"
+                }
+            ],
+            "patterns": [
+                {
+                    "observation": "a general pattern noticed across scenarios",
+                    "supporting_scenarios": ["list of scenario_ids that support this observation"],
+                }
+            ],
+            "decision_rules": [
+                {
+                    "behavioral_decision": "name of the behavior being decided",
+                    "rule_pseudocode": "express the decision rule in pseudocode, using variable names and thresholds as needed",
+                    "parameters": [
+                        {
+                            "name": "parameter_name",
+                            "role": "what it controls in the decision",
+                            "range": "expected numerical range e.g. 0.0 to 1.0",
+                            "default": "theory-grounded default value"
+                        }
+                    ],
+                    "real_life_interpretation": "one sentence describing what this rule captures in real life"
+                }
+            ]
+        }
+        This LLM agent will take a list of variables and the problem context as input.
+        It will think about how these variables interact together to drive the agent's decision-making process.
+        It will express the relationship in if-then rules"""
+    
 
 
         
