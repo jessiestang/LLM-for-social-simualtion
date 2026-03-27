@@ -21,13 +21,13 @@ if "agent" not in st.session_state:
     ### ----------------
     # Model construction
     ws["problem_context"]  = str(MODEL_DIR / "spiral_silence.txt")
-    ws["model_save_path"]  = str(MODEL_DIR / "_spiral_silence_model2.json")
+    ws["model_save_path"]  = str(MODEL_DIR / "_spiral_silence_model.json")
     ws["file_path"]        = str(MODEL_DIR / "spiral_silence_output.docx")
 
     # Code generator
     ws["user_requirements"] = str(CODE_DIR / "spiral_silence_requirement.txt")
-    ws["code_output_path"]  = str(CODE_DIR / "code_test.py")
-    ws["model_interface"]   = str(CODE_DIR / "code_test_interface.json")
+    ws["code_output_path"]  = str(CODE_DIR / "spiral_silence_code.py")
+    ws["model_interface"]   = str(CODE_DIR / "spiral_silence_code_interface.json")
 
     # Validator
     ws["evaluation_output_path"] = str(VAL_DIR / "spiral_silence_evaluation_code.py")

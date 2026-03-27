@@ -1,0 +1,146 @@
+{
+  "model": {
+    "class_name": "SpiralOfSilenceModel",
+    "available_functions": [
+      {
+        "name": "step",
+        "input_parameters": [],
+        "output": "None",
+        "description": "Advances the model by one step, updating agent states and collecting data."
+      }
+    ],
+    "implemented_framework": "Mesa",
+    "scheduler_type": "RandomActivation"
+  },
+  "agents": [
+    {
+      "class_name": "HumanAgent",
+      "available_functions": [
+        {
+          "name": "decide_to_speak",
+          "input_parameters": [],
+          "output": "None",
+          "description": "Determines whether the agent decides to speak based on various thresholds."
+        }
+      ],
+      "key_attributes": [
+        {
+          "name": "is_speaking",
+          "type": "bool",
+          "range": "True or False"
+        },
+        {
+          "name": "perceived_public_opinion",
+          "type": "float",
+          "range": "[0.0, 1.0]"
+        },
+        {
+          "name": "social_connection_strength",
+          "type": "float",
+          "range": "[0.0, 1.0]"
+        },
+        {
+          "name": "fear_of_isolation",
+          "type": "float",
+          "range": "[0.0, 1.0]"
+        },
+        {
+          "name": "opinion_stability",
+          "type": "float",
+          "range": "[0.0, 1.0]"
+        }
+      ],
+      "decision_rules": "Decides to speak based on a weighted influence of public opinion, social connection, and opinion stability."
+    },
+    {
+      "class_name": "LLMAgent",
+      "available_functions": [
+        {
+          "name": "speak",
+          "input_parameters": [],
+          "output": "int",
+          "description": "Returns the opinion of the agent, which is either 0 or 1."
+        }
+      ],
+      "key_attributes": [
+        {
+          "name": "is_speaking",
+          "type": "bool",
+          "range": "True"
+        },
+        {
+          "name": "opinion",
+          "type": "int",
+          "range": "[0, 1]"
+        }
+      ],
+      "decision_rules": "Always speaks with a fixed opinion value of either 0 or 1."
+    }
+  ],
+  "environment_settings": {
+    "key_parameters": [
+      {
+        "name": "num_human_agents",
+        "type": "int",
+        "range": ">= 0"
+      },
+      {
+        "name": "num_llm_agents",
+        "type": "int",
+        "range": ">= 0"
+      },
+      {
+        "name": "width",
+        "type": "int",
+        "range": "> 0"
+      },
+      {
+        "name": "height",
+        "type": "int",
+        "range": "> 0"
+      },
+      {
+        "name": "beta",
+        "type": "float",
+        "range": "[0.0, 1.0]"
+      },
+      {
+        "name": "gamma",
+        "type": "float",
+        "range": "[0.0, 1.0]"
+      },
+      {
+        "name": "influence_threshold",
+        "type": "float",
+        "range": "[0.0, 1.0]"
+      },
+      {
+        "name": "isolation_threshold",
+        "type": "float",
+        "range": "[0.0, 1.0]"
+      }
+    ]
+  },
+  "decision_variables": {
+    "variables": [
+      {
+        "name": "decision_influence",
+        "formula": "beta * perceived_public_opinion + (1 - beta) * social_connection_strength + gamma * opinion_stability"
+      }
+    ]
+  },
+  "output_variables": {
+    "variables": [
+      {
+        "name": "public_opinion_summary",
+        "calculation_method": "Average of collected messages from LLMAgents."
+      }
+    ]
+  },
+  "data_collection_methods": [
+    {
+      "name": "collect",
+      "description": "Collects data from agents regarding their speaking status."
+    }
+  ]
+}

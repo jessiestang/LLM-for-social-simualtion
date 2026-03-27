@@ -18,10 +18,10 @@ Agents are arranged in a two-dimensional grid, each interacting with eight neigh
 Agents should be randomly distributed in the grid regarding to their types and the opinions they hold.
 
 *system-level process*
-A media will operate at the global level. At each timeste:
+A media will operate at the global level. At each timestep:
 - Media collects opinions from agents that speak
 - Media publish all collected messages
-- Each agent will randomly sample 10 messages on the next timestep 
+- Each agent will randomly sample 10-20 messages on the next timestep
 
 *Behavioral Decisions*:
 Human agents need to determine whether they want to speak-up or not at the current simulation step.

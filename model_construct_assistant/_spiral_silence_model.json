@@ -1,0 +1,131 @@
+{
+  "model_title": "Spiral of Silence in Online Social Environments",
+  "overview": "This model simulates the spiral of silence phenomenon where agents choose to remain silent or speak based on their perceptions of public opinion and social connections.",
+  "agents": {
+    "types": [
+      "HumanAgent",
+      "LLMAgent"
+    ],
+    "attributes": {
+      "HumanAgent": [
+        {
+          "is_speaking": "boolean indicating if the agent is speaking or silent, default: false",
+          "perceived_public_opinion": "float representing the agent's perception of the majority opinion, range: 0.0 - 1.0",
+          "social_connection_strength": "float measuring closeness of social connections, range: 0.0 - 1.0",
+          "fear_of_isolation": "float capturing the fear of social isolation, range: 0.0 - 1.0",
+          "opinion_stability": "float indicating stability of the agent's opinion, range: 0.0 - 1.0"
+        }
+      ],
+      "LLMAgent": [
+        {
+          "is_speaking": "boolean always true at each timestep",
+          "opinion": "fixed opinion value of either 0 or 1, initialized at the start"
+        }
+      ]
+    },
+    "actions": {
+      "HumanAgent": [
+        "decide_to_speak"
+      ],
+      "LLMAgent": [
+        "speak"
+      ]
+    }
+  },
+  "environment": {
+    "structure": "two-dimensional grid with agents randomly distributed according to their types and opinions",
+    "interaction_rules": "agents interact with their eight immediate neighbours, sharing opinions",
+    "parameters": {
+      "grid_size": "dimensions of the grid (e.g., 10x10)",
+      "default_value_grid_size": "10",
+      "range_grid_size": "1 - 100"
+    }
+  },
+  "model_level_mechanisms": [
+    {
+      "system_name": "Media System",
+      "inputs_from_agents": "opinions of agents that are speaking at each timestep",
+      "internal_variables": [
+        {
+          "name": "collected_messages",
+          "meaning": "a collection of messages published by agents that speak",
+          "update_rule": "reset to new messages collected every timestep"
+        }
+      ],
+      "processing_logic": [
+        {
+          "rule": "average_opinion = sum(collected_messages) / count(collected_messages)",
+          "description": "This rule aggregates the opinions shared by speaking agents to understand the overall opinion in the environment."
+        }
+      ],
+      "outputs_to_agents": [
+        {
+          "output_variable": "public_opinion_summary",
+          "generation_rule": "derived from aggregated opinions, available to all agents at the next timestep",
+          "timing": "after messages are published in the current timestep"
+        }
+      ]
+    }
+  ],
+  "decision_rules": [
+    {
+      "behavioral_decision": "Human agents determining whether to speak or stay silent.",
+      "outcome_variable": "agent.is_speaking",
+      "signal_computation": [
+        {
+          "signal_name": "decision_influence",
+          "composed_from": [
+            "perceived_public_opinion",
+            "social_connection_strength",
+            "opinion_stability"
+          ],
+          "expression": "decision_influence = beta * perceived_public_opinion + (1 - beta) * social_connection_strength + gamma * opinion_stability",
+          "parameter": "beta — weight of perceived public opinion; gamma — weight of opinion stability"
+        }
+      ],
+      "rule_pseudocode": "IF decision_influence > influence_threshold:\n    agent.is_speaking = True\nELIF fear_of_isolation > isolation_threshold:\n    agent.is_speaking = False  # high fear of isolation\nELSE:\n    agent.is_speaking = False",
+      "parameters": [
+        {
+          "name": "beta",
+          "role": "controls the weight of perceived public opinion",
+          "default": "0.5",
+          "calibratable": true
+        },
+        {
+          "name": "gamma",
+          "role": "controls the weight of opinion stability",
+          "default": "0.5",
+          "calibratable": true
+        },
+        {
+          "name": "influence_threshold",
+          "role": "threshold for making a speaking decision",
+          "default": "0.5",
+          "calibratable": true
+        },
+        {
+          "name": "isolation_threshold",
+          "role": "threshold for fear of isolation leading to silence",
+          "default": "0.7",
+          "calibratable": true
+        }
+      ]
+    }
+  ],
+  "simulation_parameters": {
+    "num_agents": "number of agents in the model, sum of both human and LLM agents",
+    "time_steps": "number of iterations to simulate",
+    "constants": {
+      "constant_name_1": "initial number of human agents",
+      "default_value_constant_name_1": "50",
+      "range_constant_name_1": "1 - 100"
+    }
+  },
+  "simulation_schedule": [
+    "Step 1: Initialize agents and opinions; distribute them randomly in the grid.",
+    "Step 2: Each agent decides whether to speak or remain silent based on their internal variables.",
+    "Step 3: Media collects opinions from speaking agents and publishes them.",
+    "Step 4: Each agent samples 10-20 messages from the published messages for the next timestep.",
+    "Step 5: Repeat from Step 2 for the defined number of timesteps."
+  ]
+}
