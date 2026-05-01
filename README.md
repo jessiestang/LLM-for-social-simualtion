@@ -5,7 +5,6 @@ Agent-based models (ABMs) are widely used to simulate complex social systems. Th
 
 This project proposed a LLM-enhanced framework that integrates structured agent-based modelling with LLM-driven components, aiming to provide a more **transparent and controllable alternative to generative ABMs**. We refer to it as **eXplainable agent-based model (XABM)**.
 
----
 
 ## Framework Overview
 
@@ -20,7 +19,6 @@ The system consists of:
 
 This modular design allows for better control over agent behavior while still leveraging the genertaive power of LLMs.
 
----
 
 ## Design Rationale
 
@@ -32,7 +30,6 @@ A key design decision was to **separate control and generation**:
 
 The result is a hybrid system that balances the interpretability of rule-based ABM and the generative power of LLMs.
 
----
 
 ## Implementation
 
@@ -44,7 +41,6 @@ Key implementation aspects include:
 - structured communication between components  
 - iterative debugging of agent coordination  
 
----
 
 ## Challenges and Trade-offs
 
@@ -57,7 +53,6 @@ Key trade-offs included:
 
 To address these, I refined prompt structures and constrained agent roles to maintain stable and predictable system behavior.
 
----
 
 ## Results and Insights
 
@@ -68,7 +63,6 @@ The framework demonstrates that LLM-enhanced ABMs can:
 
 This approach provides a promising direction for combining **LLMs with traditional simulation frameworks**.
 
----
 
 ## Future Work
 
@@ -77,8 +71,6 @@ Future improvements include:
 - add memory and planning mechanisms for long-term reasoning  
 - improve context management for scalability
 - reduce the token cost induced by multi-agent communication
-
----
 
 ## Conclusion
 
