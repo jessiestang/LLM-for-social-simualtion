@@ -84,37 +84,18 @@ LLM-for-social-simulation/
 ├── streamline.py               # Entry point — launches the Streamlit web UI and wires the RouterAgent to the chat interface
 ├── router.py                   # Central orchestrator (RouterAgent) — interprets user requests, dispatches tool calls to sub-agents, and maintains a shared workspace across the session
 ├── logger.py                   # SessionLogger — records every user message, tool call, and agent response; exports sessions to JSON or CSV
-├── generated_model.py          # Example output — a Mesa ABM file produced by the framework (updated each time the code generator runs)
 │
 ├── model_construct_assistant/  # Sub-agent that translates a plain-text problem description into a structured conceptual model (decision variables → rules → mechanistic model → ODD document)
 ├── code_generator/             # Sub-agent that generates and iteratively debugs Mesa/Python simulation code from the conceptual model JSON
 ├── Validation_module/          # Sub-agent that suggests VVUQ (Verification, Validation & Uncertainty Quantification) strategies and generates the corresponding evaluation code
 │
 ├── logs/                       # Auto-generated session logs (JSON / CSV) exported by SessionLogger
-├── output_plots/               # Plots produced during model runs and validation experiments
 │
 ├── requirements.txt            # Python dependencies
 └── LICENSE
 ```
 
-### Root-level files
-
-| File | Role |
-|---|---|
-| `streamline.py` | Streamlit front end. Starts the chat UI, seeds the agent workspace with input/output file paths, and exposes session-export buttons (JSON / CSV). This is the only file users need to run directly. |
-| `router.py` | The brain of the framework. `RouterAgent` receives each user message, asks the LLM to decide which tool to call, executes the matching sub-agent function, stores results in a shared workspace, and loops until a final answer is ready. |
-| `logger.py` | `SessionLogger` timestamps and records every event (user turns, tool calls, results). Call `export_json()` or `export_csv()` to dump the full session to the `logs/` folder. |
-| `generated_model.py` | A ready-to-run Mesa ABM file written by the code generator. Treat it as output, not source — it is overwritten each time the pipeline produces a new model. |
-
-### Folders
-
-| Folder | Contents |
-|---|---|
-| `model_construct_assistant/` | Code and prompts for the model-construction sub-agent: variable extraction, decision-rule design, mechanistic model translation, and ODD-protocol formatting. |
-| `code_generator/` | Code and prompts for the code-generation sub-agent: Mesa code synthesis, automated debugging loop, and example generated models. |
-| `Validation_module/` | Code and prompts for the validation sub-agent: VVUQ strategy suggestion and evaluation-code generation. |
-| `logs/` | Session log files (one JSON and/or CSV per run), written automatically by `SessionLogger`. |
-| `output_plots/` | Figures saved during model execution and evaluation (e.g., convergence plots, sensitivity analysis charts). |
+The directories for the input and output files are updated in the file streamline.py. If other extenal tools are to be implemented, do it in the file router.py.
 
 ## How to Run the Framework
 
