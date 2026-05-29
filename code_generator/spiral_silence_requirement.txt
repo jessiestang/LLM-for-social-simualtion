@@ -1,0 +1,12 @@
+*Data Collection Task:*
+Collect the ratio of silent agents in both opinion groups at each time step (only human agents).
+Collect the number of silent agents in both opinion groups at each time step (only human agents).
+Collect the number of messages in both opinion groups collected by the media at each time step (including both human and LLM agents),
+
+*Visualization Task:*
+Show the time series of the ratio of silent agents in both opinion groups in a line graph. Use different colors for the two opinion groups.
+Show the time series of the gap between visibility of two opinions in the media message in a line graph. Use a single color for this graph.
+Show the distribution of opinion stability among all agents in a kde plot.
+
+
+

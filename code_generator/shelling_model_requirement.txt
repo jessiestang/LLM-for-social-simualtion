@@ -1,0 +1,15 @@
+*Visualization Task:*
+Show the 2D grid at three points: (a) Start of simulation (t = 0 or 1); (b) Midpoint (t = T/2); (c) Final step (t = T);
+Use distinct colors for each agent type (e.g., blue for Type 1, red for Type 2) and gray for empty cells.
+Add titles (“Initial State”, “Midpoint”, “Final State”) and legends for clarity.
+
+*Measurement Task:*
+At each timestep, count the number of agents whose decision signal is below their tolerance threshold (unhappy agents).
+Store this count in a list and plot it as a line chart over time.
+Label x-axis as “Timestep” and y-axis as “Number of Unhappy Agents.”
+Give this plot a proper title
+
+*Total Output:*
+Three grid plots
+One line plot of unhappy agents over time
+

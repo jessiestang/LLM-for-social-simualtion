@@ -1,3 +1,0 @@
-We want to explore polarization propagation and attention inequality on a social media environment, using a complex network model. 
-The nodes represent the social media users, while the edges represent their online connection, and information flow. 
-For polarization progagtion, we may look at the ideological homophily in the network, attention distribution to different users, and users'engagement with polarizing content.

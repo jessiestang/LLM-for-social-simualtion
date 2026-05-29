@@ -67,149 +67,133 @@ class LLMContext:
         )
         
 
-
 class ModelValidation():
     def __init__(self, model_name="gpt-4o-mini"): # the model needs to be able to accept image as input
         # Use a shared LLMContext so multiple agent methods share the same conceptual-model memory
         self.llm_context = LLMContext(model_name=model_name)
         self.model_name = model_name
-
-    def output_analysis(self, image_path, conceptual_model):
+    
+    def _safe_json_load(self, text: str):
         """
-        This function sends the image output from the simulation, together with the conceptual model to LLM.
-        The LLM agent will help analyzing whether the simulation output aligns with the conceptual model.
-        It will give suggestions on the model based on the analysis.
+        Robustly try to parse JSON from LLM output.
+        Strategies:
+        1) Direct `json.loads`.
+        2) Extract the first {...} or [...] block and parse.
+        3) Escape backslashes in the extracted block and parse (helps with LaTeX like `\beta`).
+        Raises ValueError with the raw text when parsing ultimately fails.
         """
-        # read a batch of images from a directory
-        image_contents = []
-        for file in os.listdir(image_path):
-            if file.endswith((".png", ".jpg", ".jpeg")):
-                with open(os.path.join(image_path, file), "rb") as img_file:
-                    img_b64 = base64.b64encode(img_file.read()).decode("utf-8")
-                    image_contents.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{img_b64}"
-                        }
-                    })
-        
-        
-        # ensure the shared context contains the conceptual model (no-op if unchanged)
-        self.llm_context.set_conceptual_model(conceptual_model)
-
-        # prompting the LLM (keeps model-specific system instructions local to this call)
-        system_prompt = """
-        You are an expert in computational social science simulation.
-        You will be presented with some image outputs from a simulation; refer to the stored conceptual model.
-        Your task is to analyze whether the simulation output aligns with the conceptual model.
-        If there are any discrepancies, provide suggestions on how to improve the model.
-        You may be given images in these following types:
-        - Heatmaps or grids: You can analyze the distribution patterns, density, and clustering of entities.
-        - Time-series plots: You can analyze trends, fluctuations, and periodicity over time.
-        - Network graphs: You can analyze the connectivity, centrality, and community structures.
-        - Histograms or bar charts: You can analyze the frequency distributions and comparative metrics.
-        Always refer to the conceptual model when analyzing the outputs.
-        Output your analysis in this format (JSON only):
-        {
-        "Plot description": "describe the plot type and key patterns",
-        "Analysis": "detailed analysis of how the output aligns or deviates from the conceptual model",
-        "Suggestions": "specific suggestions for improving the model"
-        }
-        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
-        Start your response directly with { and end with }.
-        """
-
-        text_part = {
-            "type": "text",
-            "text": (
-                "Here are the simulation output images. Refer to the stored conceptual model for guidance."
-            )
-        }
-
-        user_prompt = [text_part] + image_contents
-
-        # call the shared LLM context
-        LLM_response = self.llm_context.chat(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.2,
-            max_tokens=1500,
-        )
-
-        # parse the response
-        response = LLM_response.choices[0].message.content
         try:
-            feedback = json.loads(response)
-            return json.dumps(feedback, indent=2)
+            return json.loads(text)
         except json.JSONDecodeError:
-            print("LLM output not valid JSON, here’s raw output:")
-            return response
+            pass
 
-        
-    def evaluation_suggestion(self, analysis, conceptual_model):
+        # Extract first JSON object/array block
+        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+        if match:
+            candidate = match.group(0)
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                # Try escaping single backslashes which commonly break JSON when LLM outputs LaTeX
+                escaped = candidate.replace("\\", "\\\\")
+                try:
+                    return json.loads(escaped)
+                except json.JSONDecodeError:
+                    pass
+
+        raise ValueError(f"LLM output not valid JSON. Raw output:\n{text}")
+   
+    def _ensure_dict(self, val):
+        if isinstance(val, dict):
+            return val
+        if isinstance(val, list):
+            return val
+        if isinstance(val, str):
+            # Strip markdown fences if present
+            cleaned = re.sub(r"```json|```", "", val).strip()
+            try:
+                return json.loads(cleaned)
+            except json.JSONDecodeError:
+                # Handle double-escaped strings
+                try:
+                    return json.loads(cleaned.encode().decode('unicode_escape'))
+                except Exception:
+                    raise ValueError(f"Cannot parse as JSON: {cleaned[:200]}")
+        raise ValueError(f"Expected dict or JSON string, got {type(val).__name__}: {str(val)[:200]}")
+    
+    def evaluation_suggestion(self, model_save_path:str):
         """
         This function will give specific suggestions on how to evaluate the model,
         based on the conceptual model and the output analysis from LLM.
         """
-        conceptual_model = json.dumps(conceptual_model, indent=2)
-        output_analysis = json.dumps(analysis, indent=2)
+        with open(model_save_path, "r", encoding="utf-8") as f:
+                conceptual_model = json.load(f)
 
         # prompt the LLM
         system_prompt = """
         You are an expert in computational social science simulation.
-        Now you will be presented with a conceptual model description and an analysis of simulation outputs.
-        Your task is to provide suggestions on how we can evaluate the model. from the perspective of stochasticity control, parameter sensitivity analysis, and statistical tests.
+        Now you will be presented with a conceptual model description.
+        Your task is to provide suggestions for evaluating the model.
         Your suggestions should include the following sections:
         1. Stochasticity Control: How to control for randomness in the simulation runs.
         Be specific about the methods to use, the number of simulation runs needed, and the reasoning behind your suggestions.
         Also state what you expect to observe if the stochasticity is well controlled.
         Write in detailed steps on how to implement it.
-        An example can be: "To control for stochasticity, we can use a Monte Carlo approach by running the simulation [a number] times with different random seeds.
+        An example can be: "To control for stochasticity, we can use a [approach name] approach by running the simulation [a number] times with different random seeds.
         This will help us capture the variability in the outputs due to randomness. We can then compute the mean and standard deviation of key output metrics across these runs to assess stability.
         If stochasticity is well controlled, we expect the standard deviation of output metric X to be below a certain threshold, say [a number].
-        We can verify this by plotting the distribution of output metric X across all runs and checking for convergence."
+        The metric X is defined as [definition based on conceptual model or internal reasoning], and can be measured by [detailed steps].
+        We can verify this by plotting [suggestions for visualization]. This approach is suitable because [a reason]."
 
         2. Parameter Sensitivity Analysis: Which parameters to vary and how to assess their impact on the outputs.
         Suggested parameters should be from the conceptual model. DO NOT invent any new parameter yourself here.
         Be very specific about the range of values for analysis of each parameter, based on your internal reasoning.
         Be very specific about the approach to the sensitivity analysis. Do not just mention the name, but provide reason on why this approach,
-        and detailed steps on how to implement it.
+        and detailed steps on how to implement it. If the output metrics is not mentioned in the conceptual model, define the conceptual model and explain how that would be measured.
         Also give some suggestions on how to evaluate the impact of those parameters on the outputs.
-        An example can be: "To analyze the sensitivity of parameter X, which ranges from [a number] to [a number], we can use a one-at-a-time (OAT) approach. 
+        An example can be: "To analyze the sensitivity of parameter X, which ranges from [a number] to [a number], we can use a [approach name] approach. 
         We will vary parameter X in increments of [a number] while keeping other parameters constant, and run [a number] simulation iterations for each value to observe the changes in output metric Y.
-        We will then plot the results to visualize the sensitivity."
+        The output metric Y is defined as [definition based on conceptual model or internal reasoning], and can be measured by [detailed steps].
+        We will then visualize the sensitivity by plotting [suggestions for visualization]. This approach is suitable because [a reason]."
 
         3. Uncertainty Quantification: What metrics and statistical methods can be used to quantify uncertainty in the outputs, and how to compute them.
-        Give reasons about why those metrics are suitable for this model, and how to compute them based on the conceptual model structure.
-        An example can be: "To quantify uncertainty in output metric Z, we can compute the [a percentage] confidence interval using bootstrapping. 
+        Give reasons about why those metrics are suitable for this model, and how to compute them based on the conceptual model structure. 
+        If the output metrics is not mentioned in the conceptual model, define the conceptual model and explain how that would be measured.
+        An example can be: "To quantify uncertainty in output metric Z, we can compute the [a percentage] confidence interval using [a statistical method]. 
         This involves resampling the simulation outputs with replacement [a number] times and calculating the interval from the resulting distribution. 
-        This method is suitable because it does not assume a specific distribution for the outputs, which aligns with the stochastic nature of the model."
+        This method is suitable because [a reason]. Here the output metric Z is defined as [definition based on conceptual model or internal reasoning].
+        This metric can be computed by [detailed steps]."
 
-        4. Experimental Design: Based on the above three sections, provide a concise experimental design plan summarizing the key steps to implement the evaluation.
-        Give concrete steps on how to carry out the experiment, including the number of simulation runs, parameter settings, and analysis methods.
-        An example can be:" To implement the evaluation, we will first conduct stochasticity control by running the simulation [a number] times with varied random seeds.
-        Next, we will perform parameter sensitivity analysis on parameters X and Y using the OAT approach, varying each in specified ranges while keeping others constant.
-        Finally, we will quantify uncertainty in output metric Z using bootstrapping to compute the [a percentage] confidence interval.
-        The entire experiment will involve a total of [a number] simulation runs."
-        Your output should be in this format:
+        4. Cross-condition Comparison: Define 2-3 theoretically meaningful experimental conditions that represent different real-world scenarios, and compare model behavior across them.
+        Conditions should differ in ONE parameter at a time to allow causal interpretation. For each condition:
+        - State the theoretical motivation for this condition
+        - Specify exactly which parameter changes and to what value
+        - State the expected direction of effect and why
+        - Define how to statistically compare outcomes across conditions
+        An example can be: " "We compare three [variable] conditions: low ([variable value]), medium ([variable value]), and high ([variable value]).
+        The expected effect is that [your predicion]. We measure [outcome variable] across [number] runs per condition.
+        We and compare outputs in different conditions using [statsitical test].""
+
+        Your output should be strictly valid JSON in this exact format, with no trailing commas:
         {
-        "Stochasticity Control": "detailed suggestions",
-        "Parameter Sensitivity Analysis": "detailed suggestions",
-        "Uncertainty Quantification": "detailed suggestions",
+            "evaluation_strategies":[
+                {
+                "name": "strategy_name",
+                "description": "description of strategy"
+                }
+            ]
         }
 
-        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
-        Start your response directly with { and end with }.
+        OUTPUT RULES:
+        - Return ONLY the JSON array. No markdown, no ```json fences, no commentary.
+        - No trailing commas after the last item in any array or object.
         """
 
         user_prompt = f"""
-        Here is the analysis of the simulation outputs: {output_analysis}.
         Based on the conceptual model and output_analysis,
         please provide your evaluation suggestions following the instructions in the system prompt.
         """
-        self.llm_context.set_conceptual_model(json.loads(conceptual_model))
+        self.llm_context.set_conceptual_model(conceptual_model)
 
         LLM_response = self.llm_context.chat(
             messages=[
@@ -221,95 +205,54 @@ class ModelValidation():
         )
 
         # parse the response
-        # parse the response to extract JSON
         response = LLM_response.choices[0].message.content
-        try:
-            suggestions = json.loads(response)
-            return json.dumps(suggestions, indent=2)
-        except json.JSONDecodeError:
-            print("LLM output not valid JSON, here’s raw output:")
-            return response
-
-    def rq_driven_experimental_design(self, conceptual_model): #TODO: maybe need to move this part to another module
-        """ 
-        This function will help design the experiment plan keep the ABM fixed and explore theoretical dynamics.
+        evaluation_suggestions = self._safe_json_load(response)
+        return evaluation_suggestions
+    
+    def evaluation_code_generator(self, evaluation_suggestions:object, model_interface:str, evaluation_output_path:str):
         """
-        conceptual_model = json.dumps(conceptual_model, indent=2)
+        Generate evaluation code aligned with an existing simulation model.
+        """
+        # load conceptual model and model interface
+        evaluation_suggestions = self._ensure_dict(evaluation_suggestions)
+        with open(model_interface, "r", encoding="utf-8") as f:
+                model_interface = json.load(f)
 
-        # prompt the LLM
         system_prompt = """
-        You are an expert in experimental design for computational social science simulations.
-        Your task is to design an experiment plan to explore theoretical dynamics of a given conceptual model.
-        The conceptual model will be provided as a json object.
-        Your output should include the following sections:
-        1. Key variables and dynamics: Identify the key variables and dynamics in the conceptual model that are relevant to the research questions.
-        2. Hypotheses: Formulate clear hypotheses about the expected behaviors and outcomes based on the conceptual model.
-        3. Experimental conditions: For each hypothesis, define the experimental conditions, including parameter settings, initial conditions, and any interventions to be tested.
-        4. Data collection and analysis: For each experiment, outline the data collection methods and analysis techniques to be used to evaluate the hypotheses.
-        Your output should be in this format:
-        {
-        "Key Variables and Dynamics": "detailed description in natural language",
-        "Hypotheses": [Hypothesis1, Hypothesis2],
-        "Experimental Conditions": "detailed conditions in natural language",
-        "Data Collection and Analysis": "detailed methods in natural language"
-        }
+        You are an expert in computational social science and Python programming.
+        Generate evaluation code that aligns with an existing agent-based model.
+        You will be provided with a model interface description, and evaluation suggestions.
+        You have two tasks:
+        1. Generate Python code that implements the evaluation suggestions using the provided model interface and the model code.
+        Do NOT modify model internals.
+        Do NOT modify existed classes or functions in the model code.
+        Only vary parameters, execute runs, and analyze outputs.
+        Do NOT provide any explanations or notes outside the code. Just provide the code.
 
-        CRITICAL: Output ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap in markdown code blocks.
-        Start your response directly with { and end with }.
+        2. Re-inspect the generated code to ensure it adheres to the model interface and evaluation suggestions.
+        Make sure that all required functions and classes from the model interface are properly utilized in the generated code.
+        Make sure that all relevant dependencies are imported.
+        Your final output should be ONLY the complete Python code file.
+        If you need to make any corrections, do so directly in the code.
+        Your output should be a complete Python code file that can be run independently.
         """
 
-        user_prompt = f"""
-        Please provide your experimental design following the instructions in the system prompt.
+        user_prompt = f"""Model interface:{model_interface}, Evaluation task:{evaluation_suggestions}
+        Generate Python code that implements this evaluation.
         """
 
-        # call the LLM
-        # use the shared LLM context and ensure conceptual model is set
-        self.llm_context.set_conceptual_model(json.loads(conceptual_model))
-        experiment = self.llm_context.chat(
+        response = self.llm_context.chat(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_tokens=1500,
         )
 
-        # parse the response
-        response = experiment.choices[0].message.content
-        try:
-            feedback = json.loads(response)
-            return json.dumps(feedback, indent=2)
-        except json.JSONDecodeError:
-            print("LLM output not valid JSON, here’s raw output:")
-            return response
+        code = response.choices[0].message.content
+        code = code.replace("```python\n", "").strip() # remove unnecessary markdown formatting if any
+        code = code.replace("```", "").strip()
+        with open(evaluation_output_path, "w") as f: # export to a python file
+            f.write(code)
 
-    
-    def dataset_finding(self):
-        """
-        This function will search for relevant datasets for model validation using DuckDuckGo API or other dataset repositories.
-        The search function will be implemented as an external tool later.
-        """
-
-        pass
-    
-    def run_pipeline(self, image_path, conceptual_model):
-        """
-        Run this pipeline to perform output analysis and model validation
-        """
-        print("You must provide the detailed directory path where you store the simulation output images, and the conceptual model as a json object.")
-        # if type(conceptual_model) != dict:
-           #  raise ValueError("The conceptual model must be provided as a json object (Python dict).")
-        if not os.path.exists(image_path):
-            raise ValueError("The provided image path does not exist.")
-        
-        print("Starting output analysis...")
-        analysis = self.output_analysis(image_path, conceptual_model)
-        print(f"Output analysis completed: {analysis}")
-        print("Starting validation suggestion generation...")
-        suggestions = self.evaluation_suggestion(analysis, conceptual_model)
-        print(f"Validation suggestions generated: {suggestions}")
-        experiment = self.rq_driven_experimental_design(conceptual_model)
-        print(f"Experimental design generated: {experiment}")
-
-        #TODO: still need to add human in the loop for review
-        
+        return f"Evaluation code generated and saved to {evaluation_output_path}"
