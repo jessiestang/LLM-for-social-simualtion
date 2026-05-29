@@ -75,3 +75,44 @@ Future improvements include:
 ## Conclusion
 
 This project shows how LLMs can be integrated into agent-based modelling in a controlled and modular way. By combining explanatory clarity with LLM-driven reasoning, the XABM framework offers a more transparent and flexible approach to modelling complex social systems.
+
+## Repository Structure
+
+```
+LLM-for-social-simulation/
+│
+├── streamline.py               # Entry point — launches the Streamlit web UI and wires the RouterAgent to the chat interface
+├── router.py                   # Central orchestrator (RouterAgent) — interprets user requests, dispatches tool calls to sub-agents, and maintains a shared workspace across the session
+├── logger.py                   # SessionLogger — records every user message, tool call, and agent response; exports sessions to JSON or CSV
+│
+├── model_construct_assistant/  # Sub-agent that translates a plain-text problem description into a structured conceptual model (decision variables → rules → mechanistic model → ODD document)
+├── code_generator/             # Sub-agent that generates and iteratively debugs Mesa/Python simulation code from the conceptual model JSON
+├── Validation_module/          # Sub-agent that suggests VVUQ (Verification, Validation & Uncertainty Quantification) strategies and generates the corresponding evaluation code
+│
+├── logs/                       # Auto-generated session logs (JSON / CSV) exported by SessionLogger
+│
+├── requirements.txt            # Python dependencies
+└── LICENSE
+```
+
+The directories for the input and output files are updated in the file streamline.py. If other extenal tools are to be implemented, do it in the file router.py.
+
+## How to Run the Framework
+
+Install all the required dependencies by running the following code:
+
+```
+pip install -r requirements.txt
+```
+
+To be able to run the framework, an OpenAI API is needed. Run the following code to store it as an environment variable:
+
+```
+$env:OPENAI_API_KEY = "YOUR API KEY"
+[System.Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "YOUR API KEY HERE", "User")
+```
+
+Make sure all required input files (e.g., problem formulation, user requirement for coding) and directories for output saving are stored properly in the working space in the streamline.py file. Run the following line in your terminal to run the front end:
+
+```
+streamlit run streamline.py
